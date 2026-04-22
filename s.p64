@@ -1,0 +1,4186 @@
+picotron cartridge // www.picotron.net
+version 2
+
+:: gfx/
+:: map/
+:: objs/
+:: sfx/
+:: t/
+:: t/gfx/
+:: ui/
+:: habits.lua
+--[[pod_format="raw",created="2026-04-13 13:21:41",modified="2026-04-19 22:28:58",revision=141]]
+button:new
+(
+	habits_canvas,
+	{
+		x=0,
+		y=0,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	19+16,
+	16,
+	function() verification_canvas:activate() end,
+	nil,
+	{"shutdown"},
+	nil
+)
+button:new
+(
+	habits_canvas,
+	{
+		x=19+16,
+		y=0,
+		z=5
+	},
+	{
+		x=0,
+		y=0
+	},
+	480-(19+16),
+	16,
+	function()
+	end,
+	nil,
+	{""},
+	nil,
+	false
+)
+button:new
+(
+	habits_canvas,
+	{
+		x=0,
+		y=16,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	19+16,
+	16,
+	function() prev_tab() end,
+	nil,
+	{"prev tab"},
+	nil
+)
+button:new
+(
+	habits_canvas,
+	{
+		x=19+16,
+		y=16,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	(480-2*(19+16)),
+	16,
+	function()
+	end,
+	nil,
+	current_tab_value_holder,
+	nil,
+	false
+)
+button:new
+(
+	habits_canvas,
+	{
+		x=19+16+(480-2*(19+16)),
+		y=16,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	19+16,
+	16,
+	function() next_tab() end,
+	nil,
+	{"next tab"},
+	nil
+)
+:: icon.lua
+--[[pod_format="raw",created="2026-04-20 01:19:19",modified="2026-04-20 01:23:17",revision=7]]
+function _init()
+    scale = 30
+    offset_x = 105
+    offset_y = 0
+end
+
+function _draw()
+    cls(0)
+    
+    local logo = {
+        {0,0,1,0,0,0,0,0,0},
+        {0,0,1,0,1,0,1,0,0},
+        {0,0,1,0,0,0,0,0,0},
+        {0,0,1,1,1,1,1,0,0},
+        {1,0,1,0,0,0,1,0,1},
+        {1,1,1,0,0,0,1,1,1},
+        {0,0,1,1,1,1,1,0,0},
+        {0,1,0,0,1,0,0,1,0},
+        {0,1,1,1,0,1,1,1,0}
+    }
+
+    for y, row in ipairs(logo) do
+        for x, pixel in ipairs(row) do
+            if pixel == 1 then
+                rectfill(
+                    offset_x + (x - 1) * scale, 
+                    offset_y + (y - 1) * scale, 
+                    offset_x + x * scale - 1, 
+                    offset_y + y * scale - 1, 
+                    7
+                )
+            end
+        end
+    end
+end
+:: init.lua
+--[[pod_format="raw",created="2026-04-11 08:26:13",modified="2026-04-20 14:35:36",revision=1505]]
+function prev_tab()
+	current_tab_key -= 1
+	if current_tab_key < 1
+		then current_tab_key = #tabs
+		end
+	current_tab_value_holder[1] = tabs[current_tab_key]
+	if current_tab_value_holder[1] == "radar" then habits_canvas:switch_to()
+	elseif current_tab_value_holder[1] == "signal log" then logs_canvas:switch_to()
+	elseif current_tab_value_holder[1] == "comm center" then payout_node_canvas:switch_to()
+	end
+end
+
+function next_tab()
+	current_tab_key += 1
+	if current_tab_key > #tabs
+		then current_tab_key = 1
+		end
+	current_tab_value_holder[1] = tabs[current_tab_key]
+	if current_tab_value_holder[1] == "radar" then habits_canvas:switch_to()
+	elseif current_tab_value_holder[1] == "signal log" then logs_canvas:switch_to()
+	elseif current_tab_value_holder[1] == "comm center" then payout_node_canvas:switch_to()
+	end
+end
+function _init()
+	setup()
+end
+function setup()
+	delay_end = 0
+	
+--	window({capture_escapes=true})
+
+	src = source:new()
+	anim_init()
+
+	key_space_prev_val = false
+	key_space_curr_val = false
+
+	transparent_color = 1
+	secondary_color = 0
+	primary_color = 5
+
+--	game_init()
+
+	prev_date = nil
+	curr_date = nil
+	
+	data =
+	{
+		canvases = {},
+		elements = {},
+		buttons = {},
+		habits = {},
+		logs = {},
+		letters = {},
+		compensations = {},
+		log_set = {},
+		bars = {}
+	}
+	nice_txts = {}
+
+	payout_node_canvas = canvas:new({})
+	habits_canvas = canvas:new({})
+	logs_canvas = canvas:new({})
+	lat_keys_canvas = canvas:new({})
+	cyr_keys_canvas = canvas:new({})
+	verification_canvas = canvas:new({})
+	
+	numpad_canvas = canvas:new({})
+	statistics_canvas = canvas:new({})
+	inventory_canvas = canvas:new({})
+	save_canvas = canvas:new({})
+	
+	save_data =
+	{
+		curr_stage_name = "",
+		bux = 0,
+		signals_received = 0,
+		name = "opr-04",
+		row_indx = 0,
+		compensation = 50,
+--		num_of_habs = 0,
+--		hab_exp_vals = {},
+--		hab_lbl_vals = {},
+		num_of_logs = 0,
+		log_mrk_vals = {},
+		log_clr_vals = {},
+		log_lbl_vals = {},
+		log_is_active_vals = {},
+		num_of_letters = 0,
+		letter_mrk_vals = {},
+		letter_amount_vals = {},
+		letter_lbl_vals = {},
+		letter_is_active_vals = {},
+		happy_end = nil
+	}
+	local path = "/appdata/sierra_1_1"
+	mkdir(path)
+	save_file = path.."/save.pod"
+	local loaded = fetch(save_file)
+	if loaded and type(loaded) == "table" then
+		save_data = loaded
+		bux = save_data.bux
+--		for i=1,save_data.num_of_habs do
+--			habit:new
+--			(
+--				habits_canvas,
+--				{
+--					x=0,
+--					y=0,
+--					z=10
+--				},
+--				{save_data.hab_lbl_vals[i]},
+--				{save_data.hab_exp_vals[i]},
+--				i
+--			)
+--		end
+		local marks = {}
+		local num_of_bars = 0
+		for i=1,save_data.num_of_logs do
+			local l = log:new
+			(
+				logs_canvas,
+				{
+					x=0,
+					y=0,
+					z=10
+				},
+				save_data.num_of_logs-(i-1),
+				save_data.log_clr_vals[i],
+				{save_data.log_lbl_vals[i]}
+			)
+			if save_data.log_is_active_vals[i] == false then l:disable() end
+			l.time_btn.lbl[1] = save_data.log_mrk_vals[i]
+			local day = sub(save_data.log_mrk_vals[i], 1, 10)
+			local is_there = false
+			for m in all(marks) do
+				if m == day then
+					is_there = true
+					for b in all(data.bars) do
+						if b.lbl[1] == day then
+							add(b.log_set, l)
+						end
+					end
+				end
+			end
+			if not is_there then
+				add(marks, day)
+				num_of_bars += 1
+				local b = bar:new
+				(
+					statistics_canvas,
+					{
+						x=0,
+						y=0,
+						z=10
+					},
+					{day},
+					{},
+					1
+				)
+				add(b.log_set, l)
+			end
+		end
+		if #data.bars > 0 then
+			data.log_set = data.bars[#data.bars].log_set
+		end
+		local today = sub(tostring(dt()), 1, 10)
+		for b in all(data.bars) do
+			if b.lbl[1] == today
+			then
+				prev_date = today
+			end
+		end
+		for i=1,save_data.num_of_letters do
+			if save_data.letter_amount_vals[i] == -1 then
+				local l = message:new
+				(
+					payout_node_canvas,
+					{
+						x=0,
+						y=0,
+						z=10
+					},
+					save_data.num_of_letters-(i-1),
+					{save_data.letter_lbl_vals[i]}
+				)
+				l.time_btn.lbl[1] = save_data.letter_mrk_vals[i]
+			else
+				local l = compensation:new
+				(
+					payout_node_canvas,
+					{
+						x=0,
+						y=0,
+						z=10
+					},
+					save_data.num_of_letters-(i-1),
+					save_data.letter_amount_vals[i],
+					{save_data.letter_lbl_vals[i]}
+				)
+				if save_data.letter_is_active_vals[i] == false then l:disable() end
+				l.time_btn.lbl[1] = save_data.letter_mrk_vals[i]
+			end
+		end
+		if save_data.frozen then
+			freeze()
+		end
+	else
+		src:start_stage(src.stages.bfr_pre_lime)
+	end
+	
+	game_init()
+	
+	init1()
+	
+	last_row_pos =
+	{
+		x=45,
+		y=45,
+		z=10
+	}
+	
+	game_os = {}
+	os = {}
+	for i=1,10 do
+		add(os, o:new({x=0, y=270}, (i-1)*60, primary_color, 1))
+	end
+	prev_mb = 0
+	
+	tabs = {"comm center", "radar", "signal log"}
+	current_tab_key = 1
+	current_tab_value_holder = {tabs[current_tab_key]}
+	
+	input_str_prev_val = {}
+	input_str = nil
+	frozen = false
+	active_canvases = nil
+	
+	payout_node_canvas:switch_to()
+	
+	include "payout_node.lua"
+	include "habits.lua"
+	include "logs.lua"
+	include "lat_keys.lua"
+	include "cyr_keys.lua"
+	include "verification.lua"
+	
+	include "numpad.lua"
+	include "statistics.lua"
+	include "inventory.lua"
+	include "save.lua"
+end
+:: inventory.lua
+--[[pod_format="raw",created="2026-04-13 15:09:05",modified="2026-04-14 05:00:20",revision=25]]
+button:new
+(
+	inventory_canvas,
+	{
+		x=0,
+		y=225,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	45,
+	45,
+	function() prev_tab() end,
+	17,
+	{"prv tb"},
+	19
+)
+button:new
+(
+	inventory_canvas,
+	{
+		x=45,
+		y=225,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	240,
+	45,
+	function()
+	end,
+	17,
+	current_tab_value_holder,
+	19
+)
+button:new
+(
+	inventory_canvas,
+	{
+		x=285,
+		y=225,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	45,
+	45,
+	function() next_tab() end,
+	17,
+	{"nxt tb"},
+	19
+)
+inventory_slider = v_slider:new
+(
+	inventory_canvas,
+	{
+		x=285,
+		y=45,
+		z=-10
+	},
+	0,
+	45,
+	180,
+	19,
+	17
+)
+:: launch_anim.lua
+--[[pod_format="raw",created="2026-04-18 16:28:59",modified="2026-04-18 17:48:14",revision=59]]
+local colors = {
+	bg     = 0,
+	text   = 6,
+	dim    = 5,
+	accent = 6,
+	ui     = 6,
+	brand  = 1,
+	glow   = 6
+}
+
+local state = "logging"
+local timer = 0
+local logs = {}
+local log_index = 1
+local progress = 0
+
+local boot_messages = {
+	"SIGNAL BIOS V2.3.0",
+	"COPYRIGHT (C) 1994 DNC FOUNDATION",
+	"------------------------------",
+	"CPU: SIG-68000 @ 33MHZ",
+	"RAM: 4096KB OK",
+	"VRAM: 1024KB OK",
+	"MOUNTING DEV/SDA1...",
+	"INITIALIZING KERNEL...",
+	"LOADING DRIVERS: DISK, MOUSE, NET",
+	"STARTING SIGNALOS GUI..."
+}
+
+function anim_init()
+	cls()
+end
+
+function anim_update()
+	timer += 1
+	
+	if state == "logging" then
+		if timer % 15 == 0 and log_index <= #boot_messages then
+			add(logs, boot_messages[log_index])
+			log_index += 1
+		elseif log_index > #boot_messages then
+			state = "loading"
+			timer = 0
+		end
+	
+	elseif state == "loading" then
+		progress += 0.015
+		if progress >= 1 then
+			state = "ready"
+			timer = 0
+		end
+
+	elseif state == "ready" then
+		if timer > 60 then
+			state = "finished"
+		end
+	end
+end
+
+function anim_draw()
+	cls(colors.bg)
+	
+	if state == "logging" or state == "loading" then
+		for i, msg in ipairs(logs) do
+			print(msg, 10, 10 + (i * 10), colors.text)
+		end
+	end
+	
+	if state == "loading" then
+		local bx, by, bw, bh = 140, 200, 200, 10
+		rect(bx, by, bx + bw, by + bh, colors.dim)
+		rectfill(bx + 2, by + 2, bx + 2 + (progress * (bw - 4)), by + bh - 2, colors.accent)
+		
+		local chars = {"|", "/", "-", "\\"}
+		local spin = chars[flr(timer / 4) % 4 + 1]
+		print("SYSTEM READY " .. spin, 205, 185, colors.ui)
+	end
+	
+	if state == "ready" then
+		local cx, cy = 240, 135
+		local pulse = sin(timer / 60) * 5
+		
+--		rectfill(0, 0, 479, cy + 40, colors.brand)
+		circ(cx, cy, 30 + pulse, colors.glow)
+		
+		local title = "SignalOS"
+		print(title, cx - (#title * 2)-2, cy - 2, colors.text)
+		
+--		if timer % 40 < 20 then
+--			print("_", cx + 24, cy - 2, colors.text)
+--		end
+	end
+end
+
+function skip_anim()
+	state = "finished"
+end
+function anim_isnt_ready()
+	return state != "finished"
+end
+:: logs.lua
+--[[pod_format="raw",created="2026-04-13 13:23:05",modified="2026-04-19 22:13:34",revision=108]]
+button:new
+(
+	logs_canvas,
+	{
+		x=0,
+		y=0,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	19+16,
+	16,
+	function() verification_canvas:activate() end,
+	nil,
+	{"shutdown"},
+	nil
+)
+button:new
+(
+	logs_canvas,
+	{
+		x=19+16,
+		y=0,
+		z=5
+	},
+	{
+		x=0,
+		y=0
+	},
+	480-(19+16),
+	16,
+	function()
+	end,
+	nil,
+	{""},
+	nil,
+	false
+)
+button:new
+(
+	logs_canvas,
+	{
+		x=0,
+		y=16,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	19+16,
+	16,
+	function() prev_tab() end,
+	nil,
+	{"prev tab"},
+	nil
+)
+button:new
+(
+	logs_canvas,
+	{
+		x=19+16,
+		y=16,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	(480-2*(19+16)),
+	16,
+	function()
+	end,
+	nil,
+	current_tab_value_holder,
+	nil,
+	false
+)
+button:new
+(
+	logs_canvas,
+	{
+		x=19+16+(480-2*(19+16)),
+		y=16,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	19+16,
+	16,
+	function() next_tab() end,
+	nil,
+	{"next tab"},
+	nil
+)
+logs_slider = v_slider:new
+(
+	logs_canvas,
+	{
+		x=464,
+		y=32,
+		z=-10
+	},
+	0,
+	16,
+	238,
+	primary_color,
+	secondary_color
+)
+:: numpad.lua
+--[[pod_format="raw",created="2026-04-13 09:54:49",modified="2026-04-14 22:31:00",revision=138]]
+local primary_key_col = 17
+local secondary_key_col = 19
+local cls_btn_primary_col = 17
+local cls_btn_secondary_col = 19
+local key_z_pos = -20
+local function bs_text(str)
+    if not str or #str == 0 then return "" end
+    local i = #str
+    while i > 1 and (ord(str, i) & 0xc0) == 0x80 do
+        i = i - 1
+    end
+    return sub(str, 1, i - 1)
+end
+
+button:new
+(
+	numpad_canvas,
+	{
+		x=0,
+		y=0,
+		z=15
+	},
+	{
+		x=0,
+		y=0
+	},
+	330,
+	45,
+	function()
+	end,
+	19,
+	{""},
+	19
+)
+button:new
+(
+	numpad_canvas,
+	{
+		x=0,
+		y=120,
+		z=15
+	},
+	{
+		x=0,
+		y=0
+	},
+	330,
+	150,
+	function()
+	end,
+	secondary_key_col,
+	{""},
+	secondary_key_col
+)
+
+local numpad_row_120 = {"1","2","3"}
+for i, char in ipairs(numpad_row_120) do
+    button:new(numpad_canvas, {x=(i+3)*30, y=120, z=key_z_pos}, {x=0,y=0}, 30, 30, function() rdtxt(char) end, primary_key_col, {char}, secondary_key_col)
+end
+
+local numpad_row_150 = {"4","5","6"}
+for i, char in ipairs(numpad_row_150) do
+    button:new(numpad_canvas, {x=(i+3)*30, y=150, z=key_z_pos}, {x=0,y=0}, 30, 30, function() rdtxt(char) end, primary_key_col, {char}, secondary_key_col)
+end
+
+local numpad_row_180 = {"7","8","9"}
+for i, char in ipairs(numpad_row_180) do
+    button:new(numpad_canvas, {x=(i+3)*30, y=180, z=key_z_pos}, {x=0,y=0}, 30, 30, function() rdtxt(char) end, primary_key_col, {char}, secondary_key_col)
+end
+
+button:new(numpad_canvas, {x=120, y=210, z=key_z_pos}, {x=0,y=0}, 30, 30, function() input_str[1] = bs_text(input_str[1]) end, primary_key_col, {"back"}, secondary_key_col)
+
+local numpad_row_210 = {"0"}
+for i, char in ipairs(numpad_row_210) do
+    button:new(numpad_canvas, {x=(i+4)*30, y=210, z=key_z_pos}, {x=0,y=0}, 30, 30, function() rdtxt(char) end, primary_key_col, {char}, secondary_key_col)
+end
+
+button:new(numpad_canvas, {x=180, y=210, z=key_z_pos}, {x=0,y=0}, 30, 30,
+function()
+	for h in all(data.habits) do
+		if h.xp == input_str then
+			save_data.hab_exp_vals[h.indx] = h.xp[1]
+		end
+	end
+	store(save_file, save_data)
+	
+	if input_str[1] == "" then
+		input_str[1] = "0"
+	end
+	habits_canvas:switch_to()
+	input_str = nil
+end, cls_btn_primary_col, {"v"}, cls_btn_secondary_col)
+
+numpad_textbox = button:new
+(
+	numpad_canvas,
+	{
+		x=143,
+		y=75,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	45,
+	45,
+	function()
+	end,
+	17,
+	nil,
+	19
+)
+:: objs/compensation.lua
+--[[pod_format="raw",created="2026-04-18 11:26:37",modified="2026-04-19 18:25:56",revision=166]]
+compensation = {}
+compensation.__index = compensation
+function compensation:new(cnvs, pos, indx, amount, lbl)
+	local instance = {}
+	cnvs:add_el(instance)
+	instance.pos = pos
+	instance.indx = indx
+	instance.amount = amount
+	instance.lbl = lbl
+	instance.is_active = true
+	instance.time_btn =
+	button:new
+	(
+		cnvs,
+		instance.pos,
+		{
+			x=0,
+			y=0
+		},
+		90,
+		16,
+		function()
+		end,
+		nil,
+		{tostring(date())},
+		nil,
+		false
+	)
+	instance.amount_btn =
+	button:new
+	(
+		cnvs,
+		instance.pos,
+		{
+			x=90,
+			y=0
+		},
+		45,
+		16,
+		function()
+		end,
+		nil,
+		{instance.amount},
+		nil,
+		false
+	)
+	instance.main_btn =
+	button:new
+	(
+		cnvs,
+		instance.pos,
+		{
+			x=135,
+			y=0
+		},
+		284,
+		16,
+		function()
+		end,
+		nil,
+		lbl,
+		nil,
+		false
+	)
+	instance.claim_btn =
+	button:new
+	(
+		cnvs,
+		instance.pos,
+		{
+			x=419,
+			y=0
+		},
+		45,
+		16,
+		function()
+			if instance.is_active then
+				save_data.bux += instance.amount
+				save_data.letter_is_active_vals[save_data.num_of_letters + 1 - instance.indx]
+				= false
+				store(save_file, save_data)
+				instance:disable()
+				
+				local mx, my, mb = mouse()
+				nice_text:new
+				(
+					payout_node_canvas,
+					mx,
+					my,
+					"+ bux "..instance.amount
+				)
+			end
+		end,
+		nil,
+		{"accept"},
+		nil
+	)
+	add(data.elements, instance)
+	add(data.letters, instance)
+	setmetatable(instance, compensation)
+	return instance
+end
+function compensation:disable()
+	self.is_active = false
+	self.claim_btn.lbl = {"accepted"}
+	self.claim_btn:disable()
+end
+function compensation:update()
+	local top = 32
+	local height = 16
+	local max_number_per_screen = flr((270 - 32) / height + 0.5)
+	local _count = #data.letters-max_number_per_screen
+	if _count < 0
+		then _count = 0
+		end
+	self.pos.x = 0
+	self.pos.y = top+(self.indx-1)*height-payout_node_slider.value*(height*_count)
+end
+function compensation:draw()
+end
+:: objs/log.lua
+--[[pod_format="raw",created="2026-04-18 11:24:33",modified="2026-04-20 00:08:04",revision=432]]
+log = {}
+log.__index = log
+function log:new(cnvs, pos, indx, clr, lbl, pst_send_stg, pst_wipe_stg)
+	local instance = {}
+	cnvs:add_el(instance)
+	instance.pos = pos
+	instance.indx = indx
+	instance.clr = clr
+	instance.initial_contents = lbl[1]
+	instance.lbl = lbl
+	instance.pst_send_stg = pst_send_stg
+	instance.pst_wipe_stg = pst_wipe_stg
+	instance.is_active = true
+	instance.time_btn =
+	button:new
+	(
+		cnvs,
+		instance.pos,
+		{
+			x=0,
+			y=0
+		},
+		79,
+		16,
+		function()
+		end,
+		nil,
+		{tostring(dt())},
+		nil,
+		false
+	)
+	instance.clr_btn =
+	button:new
+	(
+		cnvs,
+		instance.pos,
+		{
+			x=79,
+			y=0
+		},
+		16,
+		16,
+		function()
+		end,
+		instance.clr,
+		{""},
+		nil,
+		false
+	)
+	instance.main_btn =
+	button:new
+	(
+		cnvs,
+		instance.pos,
+		{
+			x=79+16,
+			y=0
+		},
+		312,
+		16,
+		function()
+		end,
+		nil,
+		lbl,
+		nil,
+		false
+	)
+	instance.edit_btn =
+	button:new
+	(
+		cnvs,
+		instance.pos,
+		{
+			x=79+16+312,
+			y=0
+		},
+		19,
+		16,
+		function()
+			lat_keys_textbox.lbl = lbl
+			input_str = lbl
+			lat_keys_canvas:switch_to()
+		end,
+		nil,
+		{"edit"},
+		nil
+	)
+	instance.exp_btn =
+	button:new
+	(
+		cnvs,
+		instance.pos,
+		{
+			x=79+16+312+19,
+			y=0
+		},
+		19,
+		16,
+		function()
+			if instance.is_active then
+				save_data.log_is_active_vals[save_data.num_of_logs + 1 - instance.indx]
+				= false
+				store(save_file, save_data)
+				instance:disable()
+				
+				if (instance.initial_contents == instance.lbl[1]) then
+					if instance.pst_send_stg then
+						src:start_stage(instance.pst_send_stg)
+					end
+				else
+					if instance.pst_wipe_stg then
+						src:start_stage(instance.pst_wipe_stg)
+					end
+				end
+			end
+		end,
+		nil,
+		{"send"},
+		nil
+	)
+	instance.del_btn =
+	button:new
+	(
+		cnvs,
+		instance.pos,
+		{
+			x=79+16+312+19+19,
+			y=0
+		},
+		19,
+		16,
+		function()
+			if instance.pst_wipe_stg then
+				src:start_stage(instance.pst_wipe_stg)
+			end
+			save_data.num_of_logs -= 1
+			deli(save_data.log_mrk_vals, save_data.num_of_logs+1-instance.indx)
+			deli(save_data.log_clr_vals, save_data.num_of_logs+1-instance.indx)
+			deli(save_data.log_lbl_vals, save_data.num_of_logs+1-instance.indx)
+			store(save_file, save_data)
+			for l in all(data.logs) do
+				if l.indx > instance.indx then
+					l.indx -= 1
+				end
+			end
+			instance:destroy(cnvs)
+		end,
+		nil,
+		{"wipe"},
+		nil
+	)
+	add(data.elements, instance)
+	add(data.log_set, instance)
+	add(data.logs, instance)
+	setmetatable(instance, log)
+	return instance
+end
+function log:update()
+	local top = 32
+	local height = 16
+	local max_number_per_screen = flr((270 - 32) / height + 0.5)
+	local _count = #data.logs-max_number_per_screen
+	if _count < 0
+		then _count = 0
+		end
+	self.pos.x = 0
+	self.pos.y = top+(self.indx-1)*height-logs_slider.value*(height*_count)
+	
+	if input_str_prev_val and self.lbl then
+		if input_str_prev_val[1] != self.lbl[1] then
+			local lbl_capacity = 71
+			if self.lbl and #self.lbl[1] > lbl_capacity then
+				self.lbl[1] = string.sub(self.lbl[1], 1, lbl_capacity)
+			end
+		end
+		input_str_prev_val[1] = self.lbl[1]
+	end
+end
+function log:draw()
+end
+function log:disable()
+	self.is_active = false
+	self.edit_btn.lbl = {""}
+	self.exp_btn.lbl = {"sent"}
+	self.del_btn.lbl = {""}
+	self.edit_btn:disable()
+	self.exp_btn:disable()
+	self.del_btn:disable()
+end
+function log:destroy(cnvs)
+	local objs = {
+		self.time_btn,
+		self.clr_btn,
+		self.main_btn,
+		self.edit_btn,
+		self.exp_btn,
+		self.del_btn,
+		self
+	}
+
+	for o in all(objs) do
+		del(data.elements, o)
+		del(data.buttons, o)
+		del(data.habits, o)
+		del(data.logs, o)
+		del(data.log_set, o)
+		cnvs:del_el(o)
+	end
+	
+	for k, v in pairs(self) do
+		self[k] = nil
+	end
+end
+:: objs/message.lua
+--[[pod_format="raw",created="2026-04-18 11:24:47",modified="2026-04-19 01:45:07",revision=52]]
+message = {}
+message.__index = message
+function message:new(cnvs, pos, indx, lbl)
+	local instance = {}
+	cnvs:add_el(instance)
+	instance.pos = pos
+	instance.indx = indx
+	instance.amount = -1
+	instance.lbl = lbl
+	instance.time_btn =
+	button:new
+	(
+		cnvs,
+		instance.pos,
+		{
+			x=0,
+			y=0
+		},
+		90,
+		16,
+		function()
+		end,
+		nil,
+		{tostring(date())},
+		nil,
+		false
+	)
+	instance.main_btn =
+	button:new
+	(
+		cnvs,
+		instance.pos,
+		{
+			x=90,
+			y=0
+		},
+		374,
+		16,
+		function()
+		end,
+		nil,
+		lbl,
+		nil,
+		false
+	)
+	add(data.elements, instance)
+	add(data.letters, instance)
+	setmetatable(instance, message)
+	return instance
+end
+function message:update()
+	local top = 32
+	local height = 16
+	local max_number_per_screen = flr((270 - 32) / height + 0.5)
+	local _count = #data.letters-max_number_per_screen
+	if _count < 0
+		then _count = 0
+		end
+	self.pos.x = 0
+	self.pos.y = top+(self.indx-1)*height-payout_node_slider.value*(height*_count)
+end
+function message:draw()
+end
+:: payout_node.lua
+--[[pod_format="raw",created="2026-04-18 10:59:24",modified="2026-04-19 22:13:53",revision=82]]
+button:new
+(
+	payout_node_canvas,
+	{
+		x=0,
+		y=0,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	19+16,
+	16,
+	function() verification_canvas:activate() end,
+	nil,
+	{"shutdown"},
+	nil
+)
+button:new
+(
+	payout_node_canvas,
+	{
+		x=19+16,
+		y=0,
+		z=5
+	},
+	{
+		x=0,
+		y=0
+	},
+	480-(19+16),
+	16,
+	function()
+	end,
+	nil,
+	{""},
+	nil,
+	false
+)
+button:new
+(
+	payout_node_canvas,
+	{
+		x=0,
+		y=16,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	19+16,
+	16,
+	function() prev_tab() end,
+	nil,
+	{"prev tab"},
+	nil
+)
+button:new
+(
+	payout_node_canvas,
+	{
+		x=19+16,
+		y=16,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	(480-2*(19+16)),
+	16,
+	function()
+	end,
+	nil,
+	current_tab_value_holder,
+	nil,
+	false
+)
+button:new
+(
+	payout_node_canvas,
+	{
+		x=19+16+(480-2*(19+16)),
+		y=16,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	19+16,
+	16,
+	function() next_tab() end,
+	nil,
+	{"next tab"},
+	nil
+)
+payout_node_slider = v_slider:new
+(
+	payout_node_canvas,
+	{
+		x=464,
+		y=32,
+		z=-10
+	},
+	0,
+	16,
+	238,
+	primary_color,
+	secondary_color
+)
+:: save.lua
+--[[pod_format="raw",created="2026-04-14 04:51:52",modified="2026-04-14 06:38:24",revision=81]]
+button:new
+(
+	save_canvas,
+	{
+		x=0,
+		y=225,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	45,
+	45,
+	function() prev_tab() end,
+	17,
+	{"prv tb"},
+	19
+)
+button:new
+(
+	save_canvas,
+	{
+		x=45,
+		y=225,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	240,
+	45,
+	function()
+	end,
+	17,
+	current_tab_value_holder,
+	19
+)
+button:new
+(
+	save_canvas,
+	{
+		x=285,
+		y=225,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	45,
+	45,
+	function() next_tab() end,
+	17,
+	{"nxt tb"},
+	19
+)
+button:new
+(
+	save_canvas,
+	{
+		x=0,
+		y=81,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	150,
+	9,
+	function()end,
+	17,
+	{"your save key:"},
+	19
+)
+button:new
+(
+	save_canvas,
+	{
+		x=0,
+		y=90,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	330,
+	45,
+	function()end,
+	17,
+	save_key,
+	19
+)
+button:new
+(
+	save_canvas,
+	{
+		x=150,
+		y=135,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	90,
+	45,
+	function()
+		set_clipboard(get_save_key())
+	end,
+	17,
+	{"copy"},
+	19
+)
+button:new
+(
+	save_canvas,
+	{
+		x=240,
+		y=135,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	90,
+	45,
+	function()
+		lat_keys_textbox.lbl = save_key
+		input_str = save_key
+		lat_keys_canvas:switch_to()
+	end,
+	17,
+	{"edit"},
+	19
+)
+:: source.lua
+--[[pod_format="raw",created="2026-04-18 13:14:57",modified="2026-04-20 01:24:01",revision=2024]]
+source = {}
+source.__index = source
+function source:new()
+	local instance = {}
+	instance.curr_stage_name = ""
+	instance.stages =
+	{
+		bfr_pre_lime="switch to the radar tab and intercept a signal",
+		bfr_lime="switch to the radar tab and intercept a signal ",
+		bfr_xport="switch to the signal log tab and send a signal log",
+		send_bfr_purple="intercept a signal",
+		send_bfr_cyan="intercept a signal ",
+		send_bfr_blue="intercept a signal  ",
+		send_bfr_pink="intercept a signal   ",
+		send_bfr_yellow="intercept a signal    ",
+		send_bfr_pre_green="intercept a signal     ",
+		send_bfr_green="intercept a signal      ",
+		send_bfr_orange="intercept a signal       ",
+		send_bfr_last="intercept a signal        ",
+		send_bfr_xport="you won! thank you for playing!",
+		wipe_bfr_purple="intercept a signal          ",
+		wipe_bfr_cyan="intercept a signal           ",
+		wipe_bfr_blue="intercept a signal            ",
+		wipe_bfr_pink="intercept a signal             ",
+		wipe_bfr_yellow="intercept a signal              ",
+		wipe_bfr_pre_green="intercept a signal               ",
+		wipe_bfr_green="intercept a signal                ",
+		wipe_bfr_orange="intercept a signal                 ",
+		wipe_bfr_last="intercept a signal                  ",
+		wipe_bfr_xport="you won! thank you for playing! ",
+		reboot_asap="reboot the signalos"
+	}
+	instance.lets =
+	{
+		welcome1="we are pleased to welcome you back, operator-04!",
+		welcome2="in the radar tab, intercept signals using the arrow keys.",
+		welcome3="send signal logs in the signal log tab.",
+		protip="pro tip: use the space key to switch between tabs.",
+		gj="good job! you may accept your compensation.",
+		bonus="outstanding performance! you may accept your bonus.",
+		notice="do not edit or wipe logs. any distortion or loss of information is unacceptable.",
+		promoted="congratulations! you have been promoted to manager. compensation has been increased.",
+		attention="attention! do not accept red signals, as they may contain malware.",
+		location_request="a bonus is available for any information regarding the location of sierra 1-1."
+	}
+	instance.happy_end = nil
+	setmetatable(instance, source)
+	return instance
+end
+function source:start_stage(stage_name)
+	if stage_name == self.stages.bfr_pre_lime then
+		local l = "l"
+	elseif stage_name == self.stages.bfr_lime then
+		self:send_message(self.lets.welcome3)
+		self:send_message(self.lets.welcome2)
+		self:send_message(self.lets.welcome1)
+	elseif stage_name == self.stages.bfr_xport then
+		local l = "l"
+	elseif stage_name == self.stages.send_bfr_purple then
+		self:send_message(self.lets.protip)
+		self:send_compensation(self.lets.gj)
+	elseif stage_name == self.stages.send_bfr_cyan then
+		self:send_compensation(self.lets.gj)
+	elseif stage_name == self.stages.send_bfr_blue then
+		self:send_compensation(self.lets.gj)
+	elseif stage_name == self.stages.send_bfr_pink then
+		self:send_compensation(self.lets.gj)
+	elseif stage_name == self.stages.send_bfr_yellow then
+		self:send_compensation(self.lets.gj)
+		self:send_message(self.lets.location_request)
+		self:send_message(self.lets.attention)
+	elseif stage_name == self.stages.send_bfr_green then
+		self:send_bonus(self.lets.bonus)
+	elseif stage_name == self.stages.send_bfr_orange then
+		self:send_compensation(self.lets.gj)
+	elseif stage_name == self.stages.send_bfr_last then
+		self:send_compensation(self.lets.gj)
+	elseif stage_name == self.stages.send_bfr_xport then
+		self:send_compensation(self.lets.gj)
+	elseif stage_name == self.stages.wipe_bfr_purple then
+		self:send_message(self.lets.notice)
+	elseif stage_name == self.stages.wipe_bfr_cyan then
+		self:send_message(self.lets.notice)
+	elseif stage_name == self.stages.wipe_bfr_blue then
+		self:send_message(self.lets.notice)
+	elseif stage_name == self.stages.wipe_bfr_pink then
+		self:send_message(self.lets.notice)
+	elseif stage_name == self.stages.wipe_bfr_yellow then
+		self:send_message(self.lets.notice)
+		self:send_message(self.lets.location_request)
+		self:send_message(self.lets.attention)
+	elseif stage_name == self.stages.wipe_bfr_green then
+		self:send_message(self.lets.notice)
+	elseif stage_name == self.stages.wipe_bfr_orange then
+		self:send_message(self.lets.notice)
+	elseif stage_name == self.stages.wipe_bfr_last then
+		self:send_message(self.lets.notice)
+	elseif stage_name == self.stages.wipe_bfr_xport then
+		self:send_message(self.lets.notice)
+	end
+	self:load_stage(stage_name)
+end
+function source:load_stage(stage_name)
+	self.curr_stage_name = stage_name
+	save_data.curr_stage_name = stage_name
+	store(save_file, save_data)
+	if stage_name == self.stages.bfr_pre_lime then
+		start_timer_to_lime_stage()
+	elseif stage_name == self.stages.bfr_lime then
+		self:create_signal
+		(
+			8+9,
+			8*3+9,
+			11,
+			"its s13rra. i d0nt want th1s, charl1e!!",
+			self.stages.bfr_xport,--the stage we want to switch to RIGHT AFTER collect it
+			self.stages.send_bfr_purple,--the stage we want to switch to RIGHT AFTER send it
+			self.stages.wipe_bfr_purple--the stage we want to switch to RIGHT AFTER wipe it
+		)
+	elseif stage_name == self.stages.send_bfr_purple or
+	stage_name == self.stages.wipe_bfr_purple then
+		self:create_signal
+		(
+			flr(480/2/2+0.5),
+			flr(270/2/2+0.5),
+			16,
+			"10100111#1#10##d0n#7#137#th3m#k111#h3r##1#10#001#1110100",
+			self.stages.bfr_xport,
+			self.stages.send_bfr_cyan,
+			self.stages.wipe_bfr_cyan
+		)
+	elseif stage_name == self.stages.send_bfr_cyan or
+	stage_name == self.stages.wipe_bfr_cyan then
+		self:create_signal
+		(
+			flr(480/2+0.5)-(8+9),
+			flr(270/2+0.5)-(8+9),
+			17,
+			"s1erra, it's ch4rlie two-three. reques7ing your full call si9n. over.",
+			self.stages.bfr_xport,
+			self.stages.send_bfr_blue,
+			self.stages.wipe_bfr_blue
+		)
+	elseif stage_name == self.stages.send_bfr_blue or
+	stage_name == self.stages.wipe_bfr_blue then
+		self:create_signal
+		(
+			8+9,
+			flr(270/2+0.5)-(8+9),
+			12,
+			"si3rra one-o#e.. we can't k3ep liv1ng like this!! i n3ed y0u..",
+			self.stages.bfr_xport,
+			self.stages.send_bfr_pink,
+			self.stages.wipe_bfr_pink
+		)
+		self:create_signal
+		(
+			8+9,
+			8*3+9,
+			3,
+			"1010011101001110#001#11110#001#11111#10110#010#010#001#111111100111#1",
+			nil,
+			nil,
+			nil
+		)
+	elseif stage_name == self.stages.send_bfr_pink or
+	stage_name == self.stages.wipe_bfr_pink then
+		self:create_signal
+		(
+			flr(480/2+0.5)-(8+9),
+			8*3+9,
+			26,
+			"sierra, it's charl1e two-three. listen-in possible. don't send the da7a. t#3y#re k##",
+			self.stages.bfr_xport,
+			self.stages.send_bfr_yellow,
+			self.stages.wipe_bfr_yellow
+		)
+	elseif stage_name == self.stages.send_bfr_yellow or
+	stage_name == self.stages.wipe_bfr_yellow then
+		self:create_signal
+		(
+			8+9,
+			8*3+9,
+			10,
+			"42.0264, -87.7011",
+			self.stages.bfr_xport,
+			self.stages.send_bfr_pre_green,
+			self.stages.wipe_bfr_pre_green
+		)
+		self:create_signal
+		(
+			flr(480/2+0.5)-(8+9),
+			flr(270/2+0.5)-(8+9),
+			8,
+			"[ critical error: system corruption detected. reboot asap !!! ]",
+			self.stages.bfr_xport,
+			self.stages.send_bfr_pre_green,
+			self.stages.wipe_bfr_pre_green
+		)
+	elseif stage_name == self.stages.send_bfr_pre_green or
+	stage_name == self.stages.wipe_bfr_pre_green then
+	
+		if stage_name == self.stages.wipe_bfr_pre_green
+		then self.happy_end = true
+		else self.happy_end = false end
+		
+		start_timer_to_black_screen()
+		
+	elseif stage_name == self.stages.send_bfr_green or
+	stage_name == self.stages.wipe_bfr_green then
+		self:create_signal
+		(
+			flr(480/2+0.5)-(8+9),
+			8*3+9,
+			27,
+			"sierra, it's ch4rlie two-three. quaran7ine time is up. please re5p0nd. over.",
+			self.stages.bfr_xport,
+			self.stages.send_bfr_orange,
+			self.stages.wipe_bfr_orange
+		)
+	elseif stage_name == self.stages.send_bfr_orange or
+	stage_name == self.stages.wipe_bfr_orange then
+		if self.happy_end then
+			self:create_signal
+			(
+				8+9,
+				flr(270/2+0.5)-(8+9),
+				9,
+				"i7s si3rra one-one. i sp1ced the fe3d; we did th1s charl1e!!",
+				self.stages.bfr_xport,
+				self.stages.send_bfr_last,
+				self.stages.wipe_bfr_last
+			)
+		else
+			self:create_signal
+			(
+				8+9,
+				flr(270/2+0.5)-(8+9),
+				9,
+				"s1erra, it's charlie two-three. resp0nd-respond plea5e!",
+				self.stages.bfr_xport,
+				self.stages.send_bfr_last,
+				self.stages.wipe_bfr_last
+			)
+		end
+	elseif stage_name == self.stages.send_bfr_last or
+	stage_name == self.stages.wipe_bfr_last then
+		if self.happy_end then
+			self:create_signal
+			(
+				flr(480/2/2+0.5),
+				flr(270/2/2+0.5),
+				28,
+				"it's charl1e two-three, thank god. you're alive. y0u did this. over.",
+				self.stages.bfr_xport,
+				self.stages.send_bfr_xport,
+				self.stages.wipe_bfr_xport
+			)
+		else
+			self:create_signal
+			(
+				flr(480/2/2+0.5),
+				flr(270/2/2+0.5),
+				2,
+				"sierra, respond pl345e!!! n0 no no no. god, please no. be9 #0u n# ##",
+				self.stages.bfr_xport,
+				self.stages.send_bfr_xport,
+				self.stages.wipe_bfr_xport
+			)
+		end
+	elseif stage_name == self.stages.send_bfr_xport or
+	stage_name == self.stages.wipe_bfr_xport then
+		local l = "l"
+	end
+end
+function source:send_message(letter)
+	for l in all(data.letters) do
+	l.indx += 1
+	end
+	message:new
+	(
+		payout_node_canvas,
+		{
+			x=0,
+			y=0,
+			z=10
+		},
+		1,
+		{letter}
+	)
+	save_data.num_of_letters += 1
+	add(save_data.letter_mrk_vals, tostring(dt()))
+	add(save_data.letter_amount_vals, -1)
+	add(save_data.letter_lbl_vals, letter)
+	add(save_data.letter_is_active_vals, nil)
+	store(save_file, save_data)
+end
+function source:send_compensation(letter)
+	for l in all(data.letters) do
+	l.indx += 1
+	end
+	compensation:new
+	(
+		payout_node_canvas,
+		{
+			x=0,
+			y=0,
+			z=10
+		},
+		1,
+		save_data.compensation,
+		{letter}
+	)
+	save_data.num_of_letters += 1
+	add(save_data.letter_mrk_vals, tostring(dt()))
+	add(save_data.letter_amount_vals, save_data.compensation)
+	add(save_data.letter_lbl_vals, letter)
+	add(save_data.letter_is_active_vals, true)
+	store(save_file, save_data)
+end
+function source:send_bonus(letter)
+	for l in all(data.letters) do
+	l.indx += 1
+	end
+	compensation:new
+	(
+		payout_node_canvas,
+		{
+			x=0,
+			y=0,
+			z=10
+		},
+		1,
+		save_data.compensation*3,
+		{letter}
+	)
+	save_data.num_of_letters += 1
+	add(save_data.letter_mrk_vals, tostring(dt()))
+	add(save_data.letter_amount_vals, save_data.compensation*3)
+	add(save_data.letter_lbl_vals, letter)
+	add(save_data.letter_is_active_vals, true)
+	store(save_file, save_data)
+end
+function source:promote()
+	self:send_message(self.lets.promoted)
+	main_char.row_indx = 1
+	main_char.lt_open.index = 208;
+	main_char.lt_clsd.index = 209;
+	main_char.rt_open.index = 210;
+	main_char.rt_clsd.index = 211;
+	main_char.dn_open.index = 212;
+	main_char.dn_clsd.index = 213;
+	main_char.up_open.index = 214;
+	main_char.up_clsd.index = 215;
+	main_char.lt_dn.index = 216;
+	main_char.lt_up.index = 217;
+	main_char.rt_dn.index = 218;
+	main_char.rt_up.index = 219;
+	main_char.name = "mgr-04"
+	spawn_opr93()
+	
+	save_data.row_indx = 1
+	save_data.name = "mgr-04"
+	save_data.compensation = 100
+	store(save_file, save_data)
+end
+function source:create_signal(x, y, clr, txt, collect_bfr, send_bfr, wipe_bfr)
+	signal:new
+	(
+		{
+			x=x,
+			y=y,
+			z=-main_char_y
+		},
+		clr,
+		txt,
+		collect_bfr,
+		send_bfr,
+		wipe_bfr
+	)
+end
+:: statistics.lua
+--[[pod_format="raw",created="2026-04-13 15:09:02",modified="2026-04-18 02:50:49",revision=94]]
+button:new
+(
+	statistics_canvas,
+	{
+		x=0,
+		y=0,
+		z=5
+	},
+	{
+		x=0,
+		y=0
+	},
+	480,
+	16,
+	function()
+	end,
+	19,
+	{""},
+	19
+)
+button:new
+(
+	statistics_canvas,
+	{
+		x=0,
+		y=16,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	48,
+	16,
+	function() prev_tab() end,
+	17,
+	{"prev tab"},
+	19
+)
+button:new
+(
+	statistics_canvas,
+	{
+		x=48,
+		y=16,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	384,
+	16,
+	function()
+	end,
+	17,
+	current_tab_value_holder,
+	19
+)
+button:new
+(
+	statistics_canvas,
+	{
+		x=432,
+		y=16,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	48,
+	16,
+	function() next_tab() end,
+	17,
+	{"next tab"},
+	19
+)
+statistics_slider = h_slider:new
+(
+	statistics_canvas,
+	{
+		x=0,
+		y=254,
+		z=-10
+	},
+	1,
+	480,
+	16,
+	19,
+	17
+)
+:: t/collider.lua
+--[[pod_format="raw",created="2026-04-09 02:40:02",modified="2026-04-18 06:35:20",revision=30]]
+--collider--
+
+collider = {}
+collider.__index = collider
+function collider:new
+(obj_grid_pos, offset, size)
+ local instance = {}
+ instance.obj_grid_pos =
+ obj_grid_pos
+ instance.offset = offset
+ instance.size = size
+ setmetatable(instance, collider)
+ return instance
+end
+
+function collider:col_pos()
+ return
+  {
+   x=self.obj_grid_pos.x
+   +self.offset.x,
+   
+   y=self.obj_grid_pos.y
+   +self.offset.y,
+   
+   z=self.obj_grid_pos.z
+   +self.offset.z
+  }
+end
+
+function collider:check()
+
+ local lt_side =
+ self:col_pos().x
+ 
+ local rt_side =
+ lt_side +
+ self.size.w
+ 
+ local up_side =
+ self:col_pos().y
+ 
+ local dn_side =
+ up_side +
+ self.size.h
+ 
+ result = false
+ 
+ for o in all(objects) do
+  
+  local col = o.collider
+  
+  if col != self then
+  
+		 local col_lt_side =
+		 col:col_pos().x
+		 
+		 local col_rt_side =
+		 col_lt_side +
+		 col.size.w
+		 
+		 local col_up_side =
+		 col:col_pos().y
+		 
+		 local col_dn_side =
+		 col_up_side +
+		 col.size.h
+	  
+	  local horizontal_overlapping =
+	  lt_side < col_rt_side
+	  and
+	  col_lt_side < rt_side
+	  
+	  local vertical_overlapping =
+	  dn_side > col_up_side
+	  and
+	  col_dn_side > up_side
+	  
+	  local collision =
+	  horizontal_overlapping and
+	  vertical_overlapping
+	  
+	  if collision then
+			if getmetatable(o) == signal then
+				o:collect()
+			else
+				result = true
+			end
+		end
+	end
+end
+ 
+ return result
+ 
+end
+:: t/draw_xtras.lua
+--[[pod_format="raw",created="2026-04-09 02:43:18",modified="2026-04-18 09:34:40",revision=5]]
+function draw_names()
+	for p in all(persons) do
+		p:draw_name()
+	end
+end
+
+function draw_all_sprts()
+ local sprts = {}
+	for o in all(objects) do
+		for s in
+		all(o.animator.sprites) do
+	  add
+	  (
+	   sprts,
+	   s
+	  )
+	 end
+ end
+ 
+ sort_sprites(sprts)
+ 
+	for s in all(sprts) do
+  s:draw()
+ end
+end
+
+function get_k_of_max_z_obj(objs)
+	k_of_max_z_obj = nil
+	for k, v in pairs(objs) do
+		if k_of_max_z_obj == nil
+		then k_of_max_z_obj = k
+		elseif v.pos.z > objs[k_of_max_z_obj].pos.z
+		then k_of_max_z_obj = k end
+	end
+	return k_of_max_z_obj
+end
+
+function get_v_of_max_z_obj(objs)
+	v_of_max_z_obj = nil
+	for k, v in pairs(objs) do
+		if v_of_max_z_obj == nil
+		then v_of_max_z_obj = v
+		elseif v.pos.z > v_of_max_z_obj.pos.z
+		then v_of_max_z_obj = v end
+	end
+	return v_of_max_z_obj
+end
+
+function debug()
+ print
+ (
+  "grid_pos",
+  63,
+  0,
+  2
+ )
+ print
+ (
+  "x: "..(flr(main_char.grid_pos.x * 1000) / 1000),
+  63,
+  6,
+  2
+ )
+ print
+ (
+  "y: "..(flr(main_char.grid_pos.y * 1000) / 1000),
+  63,
+  12,
+  2
+ )
+ print
+ (
+  "z: "..(flr(main_char.grid_pos.z * 1000) / 1000),
+  63,
+  18,
+  2
+ )
+end
+:: t/game_draw.lua
+--[[pod_format="raw",created="2026-04-09 02:44:12",modified="2026-04-18 18:54:59",revision=51]]
+--draw--
+function game_draw()
+--	camera(-112, -7)
+	draw_all_sprts()
+--	draw_names()
+end
+:: t/game_init.lua
+--[[pod_format="raw",created="2026-04-09 02:43:49",modified="2026-04-20 00:16:26",revision=326]]
+--init--
+function game_init()
+ music(0)
+ palt(0, false)
+ palt(transparent_color, true)
+
+ screen_width = 240
+ screen_height = 135
+ character_width = 9
+ character_height = 9
+ 
+ sprite_fireball = 192
+ 
+ objects = {}
+ signals = {}
+ prjctls = {}
+ persons = {}
+ players = {}
+ enemies = {}
+ 
+ main_char_y =
+ (screen_height -
+ character_height) \ 2
+ 
+ src:load_stage(save_data.curr_stage_name)
+ 
+ main_char = player:new
+ (
+  {
+   x=
+   (screen_width -
+   character_width) \ 2,
+   
+   y=main_char_y,
+   
+   z=-main_char_y
+  }
+ )
+ 
+	if save_data.name == "mgr-04" then
+		spawn_opr93()
+	end
+	
+	function create_block(bx, by)
+		bpos =
+		{
+		x=bx,
+		y=by,
+		z=400
+		}
+		local block =
+		object:new
+		(
+		bpos,
+		collider:new
+		(
+		{x=bx, y=by, z=-by},
+		{x=0, y=0, z=0},
+		{w=8, h=8}
+		)
+		)
+		block_sprt = sprite:new
+		(
+		bpos,
+		220,
+		{
+		x=0,
+		y=0,
+		z=0
+		}
+		)
+		add
+		(
+		block.animator.sprites,
+		block_sprt
+		)
+	end
+	
+	for x = 0, 232, 8 do create_block(x, 16) end
+	for y = 24, 120, 8 do create_block(232, y) end
+	for x = 232, 0, -8 do create_block(x, 128) end
+	for y = 120, 24, -8 do create_block(0, y) end
+end
+
+function spawn_opr93()
+	local opr93_x = flr((480/2)/2-(9/2)+0.5)
+	if opr93_x < main_char.grid_pos.x then
+		opr93_x -= 50
+	else
+		opr93_x += 50
+	end
+	opr93 = enemy:new
+	(
+		{
+			x=opr93_x,
+			y=main_char.grid_pos.y,
+			z=main_char.grid_pos.z
+		}
+	)
+end
+:: t/game_update.lua
+--[[pod_format="raw",created="2026-04-09 02:44:06",modified="2026-04-18 05:36:36",revision=8]]
+--update--
+function game_update()
+ get_input()
+ load_all_persons()
+ update_signals()
+end
+:: t/object.lua
+--[[pod_format="raw",created="2026-04-09 02:40:28",modified="2026-04-09 02:40:28",revision=0]]
+--object--
+
+object = {}
+object.__index = object
+function object:new
+(grid_pos, collider)
+ local instance = {}
+ instance.grid_pos = grid_pos
+ instance.animator =
+ animator:new
+ (
+  grid_pos,
+  {
+   x=0,
+   y=0,
+   z=0
+  }
+ )
+ instance.collider = collider
+ setmetatable(instance, object)
+ add(objects, instance)
+ return instance
+end
+
+function object:set_pos(new_pos)
+ self.grid_pos = new_pos
+end
+
+function object:move(vector3)
+ self.grid_pos.x += vector3.x
+ self.grid_pos.y += vector3.y
+ self.grid_pos.z += vector3.z
+end
+
+function object:move_lt_up()
+ self:move
+	 (
+	  {
+	   x=-1,
+	   y=-1,
+	   z=1
+	  }
+	 )
+end
+
+function object:move_lt()
+ self:move
+  (
+   {
+    x=-1,
+    y=0,
+    z=0
+   }
+  )
+end
+
+function object:move_lt_dn()
+ self:move
+	 (
+	  {
+	   x=-1,
+	   y=1,
+	   z=-1
+	  }
+	 )
+end
+
+function object:move_up()
+ self:move
+  (
+   {
+    x=0,
+    y=-1,
+    z=1
+   }
+  )
+end
+
+function object:move_dn()
+ self:move
+  (
+   {
+    x=0,
+    y=1,
+    z=-1
+   }
+  )
+end
+
+function object:move_rt_up()
+ self:move
+	 (
+	  {
+	   x=1,
+	   y=-1,
+	   z=1
+	  }
+	 )
+end
+
+function object:move_rt()
+ self:move
+  (
+   {
+    x=1,
+    y=0,
+    z=0
+   }
+  )
+end
+
+function object:move_rt_dn()
+ self:move
+	 (
+	  {
+	   x=1,
+	   y=1,
+	   z=-1
+	  }
+	 )
+end
+
+function object:col_check()
+ return self.collider:check()
+end
+:: t/person.lua
+--[[pod_format="raw",created="2026-04-09 02:41:06",modified="2026-04-20 01:09:49",revision=260]]
+--projectile / person--
+
+--projectile--
+
+projectile = {}
+projectile.__index = projectile
+setmetatable
+(
+ projectile,
+ {__index = object}
+)
+function projectile:new(grid_pos)
+ local col =
+ collider:new
+ (
+  grid_pos,
+  {
+   x=0,
+   y=0,
+   z=0
+  },
+  {
+	 	w=5,
+	 	h=5
+  }
+ )
+ local instance =
+ object:new
+ (
+  grid_pos,
+  col
+ )
+ setmetatable(instance, projectile)
+ add(prjctls, instance)
+ return instance
+end
+
+--person--
+
+person = {}
+person.__index = person
+setmetatable
+(
+ person,
+ {__index = object}
+)
+
+function person:new
+(grid_pos, name, row_indx)
+ local col =
+ collider:new
+ (
+  grid_pos,
+  {
+   x=1,
+   y=0,
+   z=0
+  },
+  {
+	 	w=7,
+	 	h=9
+  }
+ )
+ local instance =
+ object:new
+ (
+  grid_pos,
+  col
+ )
+ instance.name = name
+ instance.eyes_are_open =
+ true
+ instance.direction =
+ 3
+ instance.left_leg =
+ 3
+ instance.right_leg =
+ 3
+ instance.prev_value_of_moved =
+ false
+ instance.moved =
+ false
+ instance.just_stopped =
+ false
+ instance.ready_to_move =
+ true
+ instance.next_leg =
+ 0
+ instance.eyes_anim_frame_index =
+ 15
+ instance.feet_anim_frame_index =
+ -1
+ instance.feet_anim_frame_index =
+ -1
+ instance.prev_movement_direction =
+ {
+  x=0,
+  y=0,
+  z=0
+ }
+ instance.movement_direction =
+ {
+  x=0,
+  y=0,
+  z=0
+ }
+ 
+ instance.lt_open = sprite:new
+ (
+  grid_pos,
+  16*row_indx+192,
+  {
+   x=2,
+   y=0,
+   z=200
+  }
+ )
+ instance.lt_clsd = sprite:new
+ (
+  grid_pos,
+  16*row_indx+192+1,
+  {
+   x=2,
+   y=0,
+   z=200
+  }
+ )
+ instance.rt_open = sprite:new
+ (
+  grid_pos,
+  16*row_indx+192+2,
+  {
+   x=2,
+   y=0,
+   z=200
+  }
+ )
+ instance.rt_clsd = sprite:new
+ (
+  grid_pos,
+  16*row_indx+192+3,
+  {
+   x=2,
+   y=0,
+   z=200
+  }
+ )
+ instance.dn_open = sprite:new
+ (
+  grid_pos,
+  16*row_indx+192+4,
+  {
+   x=2,
+   y=0,
+   z=200
+  }
+ )
+ instance.dn_clsd = sprite:new
+ (
+  grid_pos,
+  16*row_indx+192+5,
+  {
+   x=2,
+   y=0,
+   z=200
+  }
+ )
+ instance.up_open = sprite:new
+ (
+  grid_pos,
+  16*row_indx+192+6,
+  {
+   x=2,
+   y=0,
+   z=200
+  }
+ )
+ instance.up_clsd = sprite:new
+ (
+  grid_pos,
+  16*row_indx+192+7,
+  {
+   x=2,
+   y=0,
+   z=200
+  }
+ )
+ instance.lt_dn = sprite:new
+ (
+  grid_pos,
+  16*row_indx+192+8,
+  {
+   x=0,
+   y=4,
+   z=200
+  }
+ )
+ instance.lt_up = sprite:new
+ (
+  grid_pos,
+  16*row_indx+192+9,
+  {
+   x=0,
+   y=4,
+   z=200
+  }
+ )
+ instance.rt_dn = sprite:new
+ (
+  grid_pos,
+  16*row_indx+192+10,
+  {
+   x=5,
+   y=4,
+   z=200
+  }
+ )
+ instance.rt_up = sprite:new
+ (
+  grid_pos,
+  16*row_indx+192+11,
+  {
+   x=5,
+   y=4,
+   z=200
+  }
+ )
+ instance.shadow = sprite:new
+ (
+  grid_pos,
+  204,
+  {
+   x=1,
+   y=8,
+   z=600
+  }
+ )
+ instance.view = sprite:new
+ (
+  grid_pos,
+  205,
+  {
+   x=-90-198*2,
+   y=-90-198*2,
+   z=0
+  }
+ )
+ instance.mark = sprite:new
+ (
+  grid_pos,
+  222,
+  {
+   x=2,
+   y=3,
+   z=-200
+  }
+ )
+ setmetatable(instance, person)
+ add(persons, instance)
+ return instance
+end
+
+--update xtras--
+
+function person:update()
+ self:update_pos()
+ self.just_stopped =
+ 	self.prev_value_of_moved ==
+ 	true and not self.moved
+ if self.just_stopped then
+ 	self.ready_to_move = false
+ end
+ self:update_eyes_anim_frame_index()
+ self:update_frame_index()
+	self:update_head()
+	self:update_eyes()
+	self:update_legs()
+	self.prev_value_of_moved =
+	self.moved
+	self.animator.sprites = {}
+	self:load_head_sprt()
+	self:load_lt_foot_sprt()
+	self:load_rt_foot_sprt()
+	self:load_shadow_sprt()
+	if self.name[6] == "4" then
+		self:load_view_sprt()
+	end
+--	self:load_mark_sprt()
+	self.prev_movement_direction =
+	self.movement_direction
+end
+
+function person:update_pos()
+
+ local start_pos =
+ 	clone(self.grid_pos)
+ 
+ if
+  self.movement_direction.x
+  == -1
+ then
+  self:move_lt()
+  if self.collider:check()
+  then self:move_rt()
+  end
+ elseif
+  self.movement_direction.x
+  == 1
+ then
+  self:move_rt()
+  if self.collider:check()
+  then self:move_lt()
+  end
+ end
+ 
+ if
+  self.movement_direction.y
+  == -1
+ then
+  self:move_up()
+  if self.collider:check()
+  then self:move_dn()
+  end
+ elseif
+  self.movement_direction.y
+  == 1
+ then
+  self:move_dn()
+  if self.collider:check()
+  then self:move_up()
+  end
+ end
+ 
+ self.moved =
+		not are_equal
+		(
+		 self.grid_pos,
+		 start_pos
+		)
+end
+
+function person:update_eyes_anim_frame_index()
+ self.eyes_anim_frame_index += 1
+ if self.eyes_anim_frame_index
+ > 100 + d(101)
+ then
+ 	self.eyes_anim_frame_index = 0
+ end
+end
+
+function person:update_frame_index()
+ if not self.moved and
+ not self.ready_to_move then
+  self:get_ready_to_move()
+	elseif self.moved then
+	 self.feet_anim_frame_index += 1
+	 if self.feet_anim_frame_index > 7
+  then
+	 	self.feet_anim_frame_index = 0
+	 end
+ end
+end
+
+function person:get_ready_to_move()
+  self.pos_anim_frame_index = -1
+  self.feet_anim_frame_index = -1
+  self:change_leg()
+  self.ready_to_move = true
+end
+
+function person:update_head()
+ if
+	 are_equal
+	 (
+	  self.movement_direction,
+	  {
+	   x=-1,
+	   y=0,
+	   z=0
+	  }
+	 )
+ then
+  self.direction = 0
+ elseif
+	 are_equal
+	 (
+	  self.movement_direction,
+	  {
+	   x=1,
+	   y=0,
+	   z=0
+	  }
+	 )
+ then
+  self.direction = 1
+ elseif
+	 are_equal
+	 (
+	  self.movement_direction,
+	  {
+	   x=-1,
+	   y=-1,
+	   z=0
+	  }
+	 )
+	 or
+	 are_equal
+	 (
+	  self.movement_direction,
+	  {
+	   x=0,
+	   y=-1,
+	   z=0
+	  }
+	 )
+	 or
+	 are_equal
+	 (
+	  self.movement_direction,
+	  {
+	   x=1,
+	   y=-1,
+	   z=0
+	  }
+	 )
+ then
+  self.direction = 2
+ elseif
+	 are_equal
+	 (
+	  self.movement_direction,
+	  {
+	   x=-1,
+	   y=1,
+	   z=0
+	  }
+	 )
+	 or
+	 are_equal
+	 (
+	  self.movement_direction,
+	  {
+	   x=0,
+	   y=1,
+	   z=0
+	  }
+	 )
+	 or
+	 are_equal
+	 (
+	  self.movement_direction,
+	  {
+	   x=1,
+	   y=1,
+	   z=0
+	  }
+	 )
+ then
+  self.direction = 3
+ end
+end
+
+function person:update_eyes()
+ if
+  self.eyes_anim_frame_index
+  > 15
+ then
+  self.eyes_are_open = true
+ elseif
+  self.eyes_anim_frame_index
+  <= 15
+ then
+  self.eyes_are_open = false
+ end
+end
+
+function person:update_legs()
+ self:update_left_leg()
+ self:update_right_leg()
+ if self.moved and
+ self.feet_anim_frame_index
+ == 7
+ then
+  self:change_leg()
+ end
+end
+
+function person:change_leg()
+	if self.next_leg == 0
+	then
+	 self.next_leg = 1
+	elseif self.next_leg == 1
+	then
+	 self.next_leg = 0
+	end
+end
+
+function person:update_left_leg()
+ if not self.moved
+ then
+  self.left_leg = 3
+ elseif self.moved
+ then
+ 	if self.next_leg == 0
+ 	then
+   self.left_leg = 2
+  elseif self.next_leg == 1
+  then
+   self.left_leg = 3
+  end
+ end
+end
+
+function person:update_right_leg()
+ if not self.moved then
+  self.right_leg = 3
+ elseif self.moved then
+ 	if self.next_leg == 0 then
+   self.right_leg = 3
+  elseif self.next_leg == 1 then
+   self.right_leg = 2
+  end
+ end
+end
+
+function person:load_head_sprt()
+ if self.direction == 0
+ then
+  if self.eyes_are_open then
+   add
+   (
+		  self.animator.sprites,
+		  self.lt_open
+   )
+  else
+   add
+   (
+		  self.animator.sprites,
+		  self.lt_clsd
+   )
+		end
+ elseif self.direction == 1
+ then
+  if self.eyes_are_open then
+   add
+   (
+		  self.animator.sprites,
+		  self.rt_open
+   )
+  else
+   add
+   (
+		  self.animator.sprites,
+		  self.rt_clsd
+   )
+		end
+ elseif self.direction == 3
+ then
+  if self.eyes_are_open then
+   add
+   (
+		  self.animator.sprites,
+		  self.dn_open
+   )
+  else
+   add
+   (
+		  self.animator.sprites,
+		  self.dn_clsd
+   )
+		end
+ elseif self.direction == 2
+ then
+  if self.eyes_are_open then
+   add
+   (
+		  self.animator.sprites,
+		  self.up_open
+   )
+  else
+   add
+   (
+		  self.animator.sprites,
+		  self.up_clsd
+   )
+		end
+ end
+end
+
+function person:load_lt_foot_sprt()
+ if self.left_leg == 3
+ then
+   add
+   (
+		  self.animator.sprites,
+		  self.lt_dn
+   )
+ elseif self.left_leg == 2
+ then
+   add
+   (
+		  self.animator.sprites,
+		  self.lt_up
+   )
+ end
+end
+
+function person:load_rt_foot_sprt()
+ if self.right_leg == 3
+ then
+   add
+   (
+		  self.animator.sprites,
+		  self.rt_dn
+   )
+ elseif self.right_leg == 2
+ then
+   add
+   (
+		  self.animator.sprites,
+		  self.rt_up
+   )
+ end
+end
+
+function person:load_shadow_sprt()
+ add
+  (
+	  self.animator.sprites,
+	  self.shadow
+  )
+end
+
+function person:load_view_sprt()
+ add
+  (
+	  self.animator.sprites,
+	  self.view
+  )
+end
+
+function person:load_mark_sprt()
+ add
+  (
+	  self.animator.sprites,
+	  self.mark
+  )
+end
+
+function person:draw_name()
+	write(self.name, self.grid_pos.x*2-3, self.grid_pos.y*2-7, 7)
+end
+:: t/player.lua
+--[[pod_format="raw",created="2026-04-09 02:41:51",modified="2026-04-19 23:56:16",revision=50]]
+--player / enemy--
+
+--player--
+
+player = {}
+player.__index = player
+setmetatable
+(
+ player,
+ {__index = person}
+)
+function player:new(grid_pos)
+ local instance =
+ person:new(grid_pos, save_data.name, save_data.row_indx)
+ setmetatable(instance, player)
+ add(players, instance)
+ return instance
+end
+
+function player:get_input()
+ self.movement_direction.x = 0
+ self.movement_direction.y = 0
+
+ if btn(0) or key("a")
+ then
+  self.movement_direction.x
+  -= 1
+ end
+ 
+ if btn(1) or key("d")
+ then
+  self.movement_direction.x
+  += 1
+ end
+ 
+ if btn(2) or key("w")
+ then
+  self.movement_direction.y
+  -= 1
+ end
+ 
+ if btn(3) or key("s")
+ then
+  self.movement_direction.y
+  += 1
+ end
+end
+
+--enemy--
+
+enemy = {}
+enemy.__index = enemy
+setmetatable
+(
+ enemy,
+ {__index = person}
+)
+function enemy:new(grid_pos)
+ local instance =
+ person:new(grid_pos, "opr-93", 0)
+ instance.move_timer = 0
+ setmetatable(instance, enemy)
+ add(enemies, instance)
+ return instance
+end
+
+function enemy:get_input()
+ if self.move_timer <= 0 then
+  self.movement_direction.x = 0
+  self.movement_direction.y = 0
+  
+  local dir = flr(rnd(8))
+  
+  if dir == 0 then 
+   self.movement_direction.x = -1
+  elseif dir == 1 then 
+   self.movement_direction.x = 1
+  elseif dir == 2 then 
+   self.movement_direction.y = -1
+  elseif dir == 3 then 
+   self.movement_direction.y = 1
+  elseif dir == 4 then
+   self.movement_direction.x = -1
+   self.movement_direction.y = -1
+  elseif dir == 5 then
+   self.movement_direction.x = 1
+   self.movement_direction.y = -1
+  elseif dir == 6 then
+   self.movement_direction.x = -1
+   self.movement_direction.y = 1
+  elseif dir == 7 then
+   self.movement_direction.x = 1
+   self.movement_direction.y = 1
+  end
+  
+  self.move_timer = 15 + flr(rnd(30))
+ else
+  self.move_timer -= 1
+ end
+end
+:: t/signal.lua
+--[[pod_format="raw",created="2026-04-18 04:43:18",modified="2026-04-20 00:41:02",revision=794]]
+signal = {}
+signal.__index = signal
+setmetatable
+(
+ signal,
+ {__index = object}
+)
+
+function signal:new
+(grid_pos, clr, txt, pst_coll_stg, pst_send_stg, pst_wipe_stg)
+ local col =
+ collider:new
+ (
+  grid_pos,
+  {
+   x=-1,
+   y=-1,
+   z=0
+  },
+  {
+	 	w=4,
+	 	h=4
+  }
+ )
+ local instance =
+ object:new
+ (
+  grid_pos,
+  col
+ )
+ instance.clr = clr
+ instance.txt = txt
+ instance.pst_coll_stg = pst_coll_stg
+ instance.pst_send_stg = pst_send_stg
+ instance.pst_wipe_stg = pst_wipe_stg
+ instance.circs = {}
+ instance.start_time = t()
+ instance.last_spawn_t = nil
+ setmetatable(instance, signal)
+ add(signals, instance)
+ return instance
+end
+function signal:x()
+	return self.grid_pos.x*2-1
+end
+function signal:y()
+	return self.grid_pos.y*2-1
+end
+function signal:update()
+	if self.circs[1] and self.circs[1].deleted then return end
+	if #self.circs < 10 and (#self.circs == 0 or self.circs[#self.circs].frame_index > 60) then-- ((t() - self.start_time) % 2) < 0.1 then
+		if self.last_spawn_t == nil or t() - self.last_spawn_t > 1 then
+			add(self.circs, o:new({x=self:x(), y=self:y()}, 0, self.clr, 1))
+			self.last_spawn_t = t()
+		end
+	end
+end
+function signal:collect()
+	local last_circ_clr = 7
+--	del(signals, self)
+	add(self.circs, o:new({x=self.grid_pos.x*2-1, y=self.grid_pos.y*2-1}, 0, last_circ_clr, 5))
+	self:delete()
+	
+	for l in all(data.logs) do
+		l.indx += 1
+	end
+	
+	if self.clr == 8 then
+		src.curr_stage_name = src.stages.reboot_asap
+		for s in all(signals) do
+			s:delete()
+		end
+		for l in all(data.logs) do
+			l:destroy(logs_canvas)
+		end
+	end
+	
+	log:new
+	(
+		logs_canvas,
+		{
+			x=0,
+			y=0,
+			z=10
+		},
+		1,
+		self.clr,
+		{self.txt},
+		self.pst_send_stg,
+		self.pst_wipe_stg
+	)
+	save_data.num_of_logs += 1
+	
+	if self.clr != 8 then
+		save_data.signals_received += 1
+		if save_data.signals_received == 10 then
+			src:promote()
+		end
+		add(save_data.log_mrk_vals, tostring(dt()))
+		add(save_data.log_clr_vals, self.clr)
+		add(save_data.log_lbl_vals, self.txt)
+		store(save_file, save_data)
+		nice_text:new
+		(
+			habits_canvas,
+			self:x(),
+			self:y(),
+			"ready to send"
+		)
+		if self.pst_coll_stg then
+			src:start_stage(self.pst_coll_stg)
+		end
+	end
+end
+function signal:delete()
+	del(objects, self)
+	for c in all(self.circs) do
+		c.deleted = true
+	end
+end
+:: t/sprite.lua
+--[[pod_format="raw",created="2026-04-09 02:50:50",modified="2026-04-18 17:35:05",revision=66]]
+--sprite / animator--
+
+--sprite--
+
+sprite = {}
+sprite.__index = sprite
+function sprite:new
+(parent_pos, index, offset)
+
+ local instance = {}
+ 
+ instance.parent_pos =
+ parent_pos
+ 
+ instance.index =
+ index
+ 
+ instance.offset =
+ offset
+ 
+ instance.sprite_pos =
+ {
+  x=0,
+  y=0,
+  z=0
+ }
+ 
+ setmetatable(instance, sprite)
+ return instance
+ 
+end
+
+function sprite:pos()
+ self.sprite_pos.x =
+ self.parent_pos.x +
+ self.offset.x
+ 
+ self.sprite_pos.y =
+ self.parent_pos.y +
+ self.offset.y
+ 
+ self.sprite_pos.z =
+ self.parent_pos.z +
+ self.offset.z
+ 
+ return self.sprite_pos
+end
+
+function sprite:draw()
+	if self.index == 205 then
+		spr(
+		self.index,
+		self.parent_pos.x*2+self.offset.x,
+		self.parent_pos.y*2+self.offset.y
+		)
+	else
+		local x_start = self:pos().x * 2
+		local y_start = self:pos().y * 2
+		local s = get_spr(self.index)
+		
+		for py = 0, 7 do
+		  for px = 0, 7 do
+		    local col = s:get(px, py)
+		    
+		    if col ~= transparent_color then
+		      local dx = x_start + px * 2
+		      local dy = y_start + py * 2
+		      rectfill(dx, dy, dx + 1, dy + 1, col)
+		    end
+		  end
+		end
+	end
+end
+
+
+
+--animator--
+
+animator = {}
+animator.__index = animator
+function animator:new
+(obj_grid_pos, offset)
+ local instance = {}
+ instance.obj_grid_pos =
+ obj_grid_pos
+ instance.offset = offset
+ instance.sprites = {}
+ setmetatable(instance, animator)
+ return instance
+end
+
+function animator:anim_pos()
+ return
+  {
+   x=self.obj_grid_pos.x
+   +self.offset.x,
+   
+   y=self.obj_grid_pos.y
+   +self.offset.y,
+   
+   z=self.obj_grid_pos.z
+   +self.offset.z
+  }
+end
+:: t/t_main.lua
+--[[pod_format="raw",created="2026-04-09 02:35:47",modified="2026-04-18 05:05:39",revision=43]]
+include "t/xtras.lua"
+include "t/collider.lua"
+include "t/sprite.lua"
+include "t/object.lua"
+include "t/signal.lua"
+include "t/person.lua"
+include "t/player.lua"
+include "t/game_update.lua"
+include "t/update_xtras.lua"
+include "t/game_draw.lua"
+include "t/draw_xtras.lua"
+include "t/game_init.lua"
+:: t/update_xtras.lua
+--[[pod_format="raw",created="2026-04-09 02:42:48",modified="2026-04-18 16:34:51",revision=8]]
+--update xtras--
+
+function get_input()
+	for p in all(persons) do
+		p:get_input()
+	end
+end
+
+function load_all_persons()
+	for p in all(persons) do
+		p:update()
+	end
+end
+
+function update_signals()
+	for s in all(signals) do
+		s:update()
+	end
+end
+:: t/xtras.lua
+--[[pod_format="raw",created="2026-04-09 02:42:10",modified="2026-04-18 04:35:04",revision=27]]
+--xtras--
+function clone(t)
+	local t2 = {}
+	for k, v in pairs(t) do
+		t2[k] = v
+	end
+	return t2
+end
+
+function are_equal(t, t2)
+ local result = true
+ for k, v in pairs(t) do
+		if t[k] != t2[k]
+		then result = false end
+	end
+ for k, v in pairs(t2) do
+		if t[k] != t2[k]
+		then result = false end
+	end
+	return result
+end
+
+function d(num_of_edges)
+ return flr(rnd(num_of_edges))
+end
+
+function sort_sprites(arr)
+ for i=2,#arr do
+  local val = arr[i]
+  local j = i - 1
+  while j > 0 and arr[j]:pos().z < val:pos().z do
+   arr[j+1] = arr[j]
+   j -= 1
+  end
+  arr[j+1] = val
+ end
+end
+:: ui/nice_text.lua
+--[[pod_format="raw",created="2026-04-19 02:01:05",modified="2026-04-19 02:54:12",revision=164]]
+nice_text = {}
+nice_text.__index = nice_text
+
+function nice_text:new(cnvs, x, y, txt)
+    local instance = {}
+    cnvs:add_el(instance)
+    instance.pos =
+    {
+    	x=x-(flr(#txt/2+0.5)*4),
+    	y=y,
+    	z=-200
+    }
+    instance.txt = txt
+    instance.frame_index = 0
+    instance.speed = 1
+    instance.deleted = false
+    instance.clr = 7
+    return setmetatable(instance, nice_text)
+end
+
+function nice_text:update()
+	if self.deleted then return end
+	self.frame_index += self.speed
+	if self.frame_index > 300 then
+		self.deleted = true
+	end
+	self.clr += 1
+	if self.clr > 12 then
+		self.clr = 7
+	end
+end
+
+function nice_text:draw()
+	if self.deleted then return end
+    local oy = -(self.frame_index / 2)
+    write(self.txt, self.pos.x, self.pos.y + oy, self.clr)
+end
+:: verification.lua
+--[[pod_format="raw",created="2026-04-19 21:46:52",modified="2026-04-19 22:13:15",revision=88]]
+button:new
+(
+	verification_canvas,
+	{
+		x=160,
+		y=90,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	160,
+	90,
+	function() end,
+	nil,
+	{"are you sure?"},
+	nil,
+	false
+)
+button:new
+(
+	verification_canvas,
+	{
+		x=320-(19+16)-(19+16),
+		y=180-16,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	19+16,
+	16,
+	function() exit() end,
+	nil,
+	{"  yes   "},
+	nil
+)
+button:new
+(
+	verification_canvas,
+	{
+		x=320-(19+16),
+		y=180-16,
+		z=0
+	},
+	{
+		x=0,
+		y=0
+	},
+	19+16,
+	16,
+	function() verification_canvas:deactivate() end,
+	nil,
+	{"   no   "},
+	nil
+)
+:: xtras.lua
+--[[pod_format="raw",created="2026-04-13 05:04:37",modified="2026-04-18 15:45:23",revision=64]]
+function clear(t)
+	for k in pairs(t) do
+		t[k] = nil
+	end
+end
+function get_key_by_val(tbl, val)
+	for k, v in ipairs(tbl) do
+		if v == val then return k end
+	end
+	return nil
+end
+:: .info.pod
+--[[pod,created="2026-03-27 05:34:19",file_item={},modified="2026-04-20 19:05:04",runtime=25,workspaces={{location="main.lua#616",workspace_index=1},{location="gfx/0.gfx#205",workspace_index=2},{location="map/0.map",workspace_index=3},{location="sfx/0.sfx",workspace_index=4}}]]
+:: cyr_keys.lua
+b64$LS1bW3BvZF9mb3JtYXQ9InJhdyIsY3JlYXRlZD0iMjAyNi0wNC0xMyAwNToyNDo0NyIsbW9k
+aWZpZWQ9IjIwMjYtMDQtMTkgMjI6Mjg6NDkiLHJldmlzaW9uPTMxMl1dCmxvY2FsIGxlZnQgPSA3
+NQpsb2NhbCBwcmltYXJ5X2tleV9jb2wgPSBuaWwKbG9jYWwgc2Vjb25kYXJ5X2tleV9jb2wgPSBu
+aWwKbG9jYWwgY2xzX2J0bl9wcmltYXJ5X2NvbCA9IG5pbApsb2NhbCBjbHNfYnRuX3NlY29uZGFy
+eV9jb2wgPSBuaWwKbG9jYWwga2V5X3pfcG9zID0gLTIwCmxvY2FsIGZ1bmN0aW9uIGJzX3RleHQo
+c3RyKQogICAgaWYgbm90IHN0ciBvciAjc3RyID09IDAgdGhlbiByZXR1cm4gIiIgZW5kCiAgICBs
+b2NhbCBpID0gI3N0cgogICAgd2hpbGUgaSA_IDEgYW5kIChvcmQoc3RyLCBpKSAmIDB4YzApID09
+IDB4ODAgZG8KICAgICAgICBpID0gaSAtIDEKICAgIGVuZAogICAgcmV0dXJuIHN1YihzdHIsIDEs
+IGkgLSAxKQplbmQKYnV0dG9uOm5ldwooCgljeXJfa2V5c19jYW52YXMsCgl7CgkJeD0wLAoJCXk9
+MCwKCQl6PTAKCX0sCgl7CgkJeD0wLAoJCXk9MAoJfSwKCTE5KzE2LAoJMTYsCglmdW5jdGlvbigp
+IHZlcmlmaWNhdGlvbl9jYW52YXM6YWN0aXZhdGUoKSBlbmQsCgluaWwsCgl7InNodXRkb3duIn0s
+CgluaWwKKQpidXR0b246bmV3CigKCWN5cl9rZXlzX2NhbnZhcywKCXsKCQl4PTE5KzE2LAoJCXk9
+MCwKCQl6PTUKCX0sCgl7CgkJeD0wLAoJCXk9MAoJfSwKCTQ4MC0oMTkrMTYpLAoJMTYsCglmdW5j
+dGlvbigpCgllbmQsCgluaWwsCgl7IiJ9LAoJbmlsLAoJZmFsc2UKKQpidXR0b246bmV3CigKCWN5
+cl9rZXlzX2NhbnZhcywKCXsKCQl4PWxlZnQsCgkJeT0xMjAsCgkJej0xNQoJfSwKCXsKCQl4PTAs
+CgkJeT0wCgl9LAoJMzMwLAoJMTUwLAoJZnVuY3Rpb24oKQoJZW5kLAoJc2Vjb25kYXJ5X2tleV9j
+b2wsCgl7IiJ9LAoJc2Vjb25kYXJ5X2tleV9jb2wsCglmYWxzZQopCmJ1dHRvbjpuZXcoY3lyX2tl
+eXNfY2FudmFzLCB7eD1sZWZ0KzMwMCwgeT05MCwgej1rZXlfel9wb3N9LCB7eD0wLHk9MH0sIDMw
+LCAzMCwKZnVuY3Rpb24oKQoJZm9yIGggaW4gYWxsKGRhdGEuaGFiaXRzKSBkbwoJCWlmIGgubGJs
+ID09IGlucHV0X3N0ciB0aGVuCgkJCXNhdmVfZGF0YS5oYWJfbGJsX3ZhbHNbaC5pbmR4XSA9IGgu
+bGJsWzFdCgkJZW5kCgllbmQKCXN0b3JlKHNhdmVfZmlsZSwgc2F2ZV9kYXRhKQoJCglsb2dzX2Nh
+bnZhczpzd2l0Y2hfdG8oKQoJaW5wdXRfc3RyID0gbmlsCmVuZCwgY2xzX2J0bl9wcmltYXJ5X2Nv
+bCwgeyJzYXZlIn0sIGNsc19idG5fc2Vjb25kYXJ5X2NvbCkKCmxvY2FsIGtleXNfcm93XzEyMCA9
+IHsiMSIsIjIiLCIzIiwiNCIsIjUiLCI2IiwiNyIsIjgiLCI5IiwiMCJ9CmZvciBpLCBjaGFyIGlu
+IGlwYWlycyhrZXlzX3Jvd18xMjApIGRvCiAgICBidXR0b246bmV3KGN5cl9rZXlzX2NhbnZhcywg
+e3g9bGVmdCsoaS0xKSozMCwgeT0xMjAsIHo9a2V5X3pfcG9zfSwge3g9MCx5PTB9LCAzMCwgMzAs
+IGZ1bmN0aW9uKCkgcmR0eHQoY2hhcikgZW5kLCBwcmltYXJ5X2tleV9jb2wsIHtjaGFyfSwgc2Vj
+b25kYXJ5X2tleV9jb2wpCmVuZApidXR0b246bmV3KGN5cl9rZXlzX2NhbnZhcywge3g9bGVmdCsz
+MDAsIHk9MTIwLCB6PWtleV96X3Bvc30sIHt4PTAseT0wfSwgMzAsIDMwLCBmdW5jdGlvbigpIGlu
+cHV0X3N0clsxXSA9IGJzX3RleHQoaW5wdXRfc3RyWzFdKSBlbmQsIHByaW1hcnlfa2V5X2NvbCwg
+eyJiYWNrIn0sIHNlY29uZGFyeV9rZXlfY29sKQoKbG9jYWwga2V5c19yb3dfMTUwID0geyLQuSIs
+ItGGIiwi0YMiLCLQuiIsItC1Iiwi0L0iLCLQsyIsItGIIiwi0YkiLCLQtyIsItGFIn0KZm9yIGks
+IGNoYXIgaW4gaXBhaXJzKGtleXNfcm93XzE1MCkgZG8KICAgIGJ1dHRvbjpuZXcoY3lyX2tleXNf
+Y2FudmFzLCB7eD1sZWZ0KyhpLTEpKjMwLCB5PTE1MCwgej1rZXlfel9wb3N9LCB7eD0wLHk9MH0s
+IDMwLCAzMCwgZnVuY3Rpb24oKSByZHR4dChjaGFyKSBlbmQsIHByaW1hcnlfa2V5X2NvbCwge2No
+YXJ9LCBzZWNvbmRhcnlfa2V5X2NvbCkKZW5kCgpsb2NhbCBrZXlzX3Jvd18xODAgPSB7ItGEIiwi
+0YsiLCLQsiIsItCwIiwi0L8iLCLRgCIsItC_Iiwi0LsiLCLQtCIsItC2Iiwi0Y0ifQpmb3IgaSwg
+Y2hhciBpbiBpcGFpcnMoa2V5c19yb3dfMTgwKSBkbwogICAgYnV0dG9uOm5ldyhjeXJfa2V5c19j
+YW52YXMsIHt4PWxlZnQrKGktMSkqMzAsIHk9MTgwLCB6PWtleV96X3Bvc30sIHt4PTAseT0wfSwg
+MzAsIDMwLCBmdW5jdGlvbigpIHJkdHh0KGNoYXIpIGVuZCwgcHJpbWFyeV9rZXlfY29sLCB7Y2hh
+cn0sIHNlY29uZGFyeV9rZXlfY29sKQplbmQKCmxvY2FsIGtleXNfcm93XzIxMCA9IHsi0ZEiLCLR
+jyIsItGHIiwi0YEiLCLQvCIsItC4Iiwi0YIiLCLRjCIsItCxIiwi0Y4iLCLRiiJ9CmZvciBpLCBj
+aGFyIGluIGlwYWlycyhrZXlzX3Jvd18yMTApIGRvCiAgICBidXR0b246bmV3KGN5cl9rZXlzX2Nh
+bnZhcywge3g9bGVmdCsoaS0xKSozMCwgeT0yMTAsIHo9a2V5X3pfcG9zfSwge3g9MCx5PTB9LCAz
+MCwgMzAsIGZ1bmN0aW9uKCkgcmR0eHQoY2hhcikgZW5kLCBwcmltYXJ5X2tleV9jb2wsIHtjaGFy
+fSwgc2Vjb25kYXJ5X2tleV9jb2wpCmVuZAoKYnV0dG9uOm5ldyhjeXJfa2V5c19jYW52YXMsIHt4
+PWxlZnQrNjAsIHk9MjQwLCB6PWtleV96X3Bvc30sIHt4PTAseT0wfSwgMjEwLCAzMCwgZnVuY3Rp
+b24oKSByZHR4dCgiICIpIGVuZCwgcHJpbWFyeV9rZXlfY29sLCB7IiJ9LCBzZWNvbmRhcnlfa2V5
+X2NvbCkKYnV0dG9uOm5ldyhjeXJfa2V5c19jYW52YXMsIHt4PWxlZnQrMjcwLCB5PTI0MCwgej1r
+ZXlfel9wb3N9LCB7eD0wLHk9MH0sIDYwLCAzMCwgZnVuY3Rpb24oKSBsYXRfa2V5c190ZXh0Ym94
+LmxibCA9IGN5cl9rZXlzX3RleHRib3gubGJsIGxhdF9rZXlzX2NhbnZhczpzd2l0Y2hfdG8oKSBl
+bmQsIHByaW1hcnlfa2V5X2NvbCwgeyJlbiJ9LCBzZWNvbmRhcnlfa2V5X2NvbCkKCmN5cl9rZXlz
+X3RleHRib3ggPSBidXR0b246bmV3CigKCWN5cl9rZXlzX2NhbnZhcywKCXsKCQl4PTQ4MCwKCQl5
+PTI3MCwKCQl6PTAKCX0sCgl7CgkJeD0wLAoJCXk9MAoJfSwKCTMwMCwKCTMwLAoJZnVuY3Rpb24o
+KQoJZW5kLAoJbmlsLAoJbmlsLAoJbmlsLAoJZmFsc2UKKQ==
+:: gfx/.info.pod
+--[[pod,created="2026-03-27 05:34:19",file_item={},modified="2026-04-20 19:05:04"]]
+:: gfx/0.gfx
+b64$LS1bW3BvZCxjcmVhdGVkPSIyMDI2LTA0LTEyIDExOjQxOjQwIixtb2RpZmllZD0iMjAyNi0w
+NC0yMCAwMDoxOToyMyIscmV2aXNpb249MjM0XV1sejQAmgYAAKpUAAD1CXtbMF09e2JtcD1weHUA
+QyAICAQnQAcABwQA8wIn8A0sZmxhZ3M9MCxwYW5feAgAx3k9MCx6b29tPTh9LEAAYAMFBBcQBwIA
+LwAnOAAcTycQRxA0AB8-NxA3NAAcUAcAFwA3ogAPOAAcPzcQJ2wAHl83EDcAN9QAHgFAAQ_gAB8v
+AEdsAB4uNwBAAQ9oABEvFwCeAB8-JwAHoAAeEQANAS8gFzcAHCAXAOUBHxcPAR9vEBcABxAnNgAi
+LwcQ3AAiHwC-AiEPgQEhLycAlwMlPwcQF6YAIgDxAQ_oAB8BpgAfEIYBHxFn8gEfByoCJA86AB8h
+ACc3AC8nAD8DHw8sAiARB6gAPycQF3cDIg-eAB8O7QQPYgIWPxAHAC0CICEXAIsBDzoAIi83AHMA
+JB9nNgAgAIoBD1IBIQJ3Bh83fgMfLgAHlAQPpQVFDq8GD9kFRAGBBw80BR8-FyBH1QVaHyflAR4A
+AgARJwYAHwfrAR4-JyA3xwIiDzoDIT8nIAc4ACIO2QUPawUgD9sFUg4pBw-ZBU0fF6gAIg4RBg8Z
+CUcOowUPvgRKAwwDHyegBSMBRQMPaQIgADQADywHIQ8ZDCUPTAYlP4cQF1sNIACXBB8XCwMiHzeK
+CSAPEAYfEBdZBB8QPgMeEwd3Ax8HQAMgAjwADycCHT9QJ1DPAh4foMkCHj8AB3BvAyAiEAepAx8A
+GQQeH8BsAB4QMD8BLwcw2AAePxAHkDQAHB_QCgEgAggBH0A4AB4f52kJIC8XMGcAG2EJCQQQB3Cn
+BEAwB3BHrwGTIAcANyAnEEcgxQwPRwYcXxAQBPDwMQD---------------------------88YQgI
+BDAHIZEVfyEwByFH8RM_AB8fMDsAJCMHMHkALwcwPgAkHzA7ACMgQCF3AD8AIUA8ACIfQDgAIkQH
+IAchBAAPPgBe-wEABxAhJxBBJzEHEAcxJ-EMQAAjTzE3MTd8AB4AagHPMQAnMRdREAdBJ-ENPwAk
+XydBJ-EVPAAcf2ABYBFA8Ro2ABhQKN4DAAAEAD8E8P8BAP------_CEi8QsGMLXxFAcAMKnxHAcA
+MKHxJAcAMJnxLAcAMJLxMgcAMIzxOAcAMIfxPAcAMIPxQAcAMH7xRgcAMHnxSgcAMHXxTgcAMHLx
+UAcAMG-xVAcAMGvxWAcAMGjxWgcAMGXxXgcAMGLxYAcAMF-xZAcAMFzxZgcAMFrxaAcAMFfxbAcA
+MFTxbgcAMFLxcAcAMFDxcgcAME7xdAcAMEvxeAcAMEjxegcAMEbxfAcAMETxfgcAMELxgAcAEkEH
+ADBA8YIHADA_8YQHADA88YYHADA68YgHADA48YoHABI3BwAwNvGMBwAwNPGOBwAwMvGQBwASMQcA
+MDDxkgcAMC7xlAcAEi0HADAs8ZYHADAq8ZgHABIpBwAwKPGaBwASJwcAMCbxnAcAMCTxngcAEiMH
+ADAi8aAHABIhBwAwIPGiBwAZHwcAMB7xpAcAEh0HADAc8aYHABIbBwAwGvGoBwAZGQcAMBjxqgcA
+GRcHADAW8awHAB8VBwABMBTxrgcAHxMHAAEwEvGwBwAfEQcAATAQ8bIHAB8PBwAdMA7xtAcAHw0H
+AHEZDpoADwcAFxkQCgEKBwAZEkIBCgcAGRR6AQoHAB8WuQEBHxjjAQEZGgYCGRwiAh8eRQIBGSBo
+AhkihAISJJkCGSauAhkoygISKt8CGSz0AhIuCQMZMB4DEjIzAxI0QQMZNlYDEjhrAxI6eQMSPIcD
+Ej6VAxlAqgMSQr8DEkTNAxJG2wMSSOkDEkv3AxJOBQQSUBMEElIhBBJULwQSVz0EElpLBBJcWQQS
+X2cEEmJ1BBJlgwQSaJEEEmufBBJvrQQScrsEEnXJBBJ51wQSfuUEEoPzBBKHAQUSjA8FEpIdBRKZ
+KwUSoTkFEqlHBRK1VQUPAQD-------YfIp4RCz8wLjXgFB0fMTEAKwDTFM8IIQgACAAIITAIIUjx
+Eh4RMDgADzsAIiMIMHkALwgwPgAkHzA7ACMgQCF3AAARFR9IERUkDzgAH0QIIAghBAAPPgBe-wEA
+CBAhKBBBKDEIEAgxKPEMQAAjTzE4MTh8AB4AagHPMQAoMRhREAhBKPENPwAkPyhBKBEVHi-wMAwV
+Ii-x-wEA-------------------9H3eoEhtjCAgERyEHAgAPsSUPD7MSHQoxAI8ICATxCwXxFDQA
+HR8wlgAeDzEA------_bUG09OH19
+:: label.qoi
+b64$cW9pZgAAAeAAAAEOBAH9-ej_--Ho3P4AAAD9-f39-f39zj-cNf39-f39-f3OP9w1-f39-f39
+-c4-3DX9-f39-f39zj-cNf39-f39-f3OP9w1-f39-f39-c4-3DX9-f39-f39zj-cNf39-f39-f3O
+P9w1-f39-f39-c4-3DX9-f39-f39zj-cNf39-f39-f3OP9w1-f39-f39-c4-3DX9-f39-f39zj-c
+Nf39-f39-f3OP9w1-f39-f39-c4-3DX9-f39-f39zj-cNf39-f39-f3OP9w1-f39-f39-c4-3DX9
+-f39-f39zj-cNf39-f39-f3OP9w1-f39-f39-c4-3DX9-f39-f39zj-cNf39-f39-f3OP9w1-f39
+-f39-c4-3DX9-f39-f39zj-cNf39-f39-f3OP9w1-f39-f39-c4-3DX9-f39-f39zj-cNf39-f39
+-f3OP9w1-f39-f39-c4-3DXcP9w13D-cNf39-f390j-cNdw-3DXcP9w1-f39-f3SP9w13D-cNdw-
+3DX9-f39-dI-3DXcP9w13D-cNf39-f390j-cNdw-3DXcP9w1-f39-f3SP9w13D-cNdw-3DX9-f39
+-dI-3DXcP9w13D-cNf39-f390j-cNdw-3DXcP9w1-f39-f3SP9w13D-cNdw-3DX9-f39-dI-3DXc
+P9w13D-cNf39-f390j-cNdw-3DXcP9w1-f39-f3SP9w13D-cNdw-3DX9-f39-dI-3DXcP9w13D-c
+Nf39-f390j-cNdw-3DXcP9w1-f39-f3SP9w13D-cNdw-3DX9-f39-dI-3DXcP9w13D-cNf39-f39
+0j-cNdw-3DXcP9w1-f39-f3SP9w13D-cNdw-3DX9-f39-dI-3DXcP9w13D-cNf39-f390j-cNdw-
+3DXcP9w1-f39-f3SP9w13D-cNdw-3DX9-f39-dI-3DXcP9w13D-cNf39-f390j-cNdw-3DXcP9w1
+-f39-f3SP9w13D-cNdw-3DX9-f39-dI-3DXcP9w13D-cNf39-f390j-cNdw-3DXcP9w1-f39-f3S
+P9w13D-cNdw-3DX9-f39-dI-3DXcP9w13D-cNf39-f390j-cNdw-3DXcP9w1-f39-f3SP9w13D-c
+Ndw-3DX9-f39-dI-3DX9-f39-f39zj-cNf39-f39-f3OP9w1-f39-f39-c4-3DX9-f39-f39zj-c
+Nf39-f39-f3OP9w1-f39-f39-c4-3DX9-f39-f39zj-cNf39-f39-f3OP9w1-f39-f39-c4-3DX9
+-f39-f39zj-cNf39-f39-f3OP9w1-f39-f39-c4-3DX9-f39-f39zj-cNf39-f39-f3OP9w1-f39
+-f39-c4-3DX9-f39-f39zj-cNf39-f39-f3OP9w1-f39-f39-c4-3DX9-f39-f39zj-cNf39-f39
+-f3OP9w1-f39-f39-c4-3DX9-f39-f39zj-cNf39-f39-f3OP9w1-f39-f39-c4-3DX9-f39-f39
+zj-cNf39-f39-f3OP9w1-f39-f39-c4-3DX9-f39-f39zj-cNf39-f39-f3OP9w1-f39-f39-c4-
+-f3YNf39-f390j-9-dg1-f39-f3SP-392DX9-f39-dI--f3YNf39-f390j-9-dg1-f39-f3SP-39
+2DX9-f39-dI--f3YNf39-f390j-9-dg1-f39-f3SP-392DX9-f39-dI--f3YNf39-f390j-9-dg1
+-f39-f3SP-392DX9-f39-dI--f3YNf39-f390j-9-dg1-f39-f3SP-392DX9-f39-dI--f3YNf39
+-f390j-9-dg1-f39-f3SP-392DX9-f39-dI--f3YNf39-f390j-9-dg1-f39-f3SP-392DX9-f39
+-dI--f3YNf39-f390j-9-dg1-f39-f3SP-392DX9-f39-dI--f3YNf39-f390j-9-dg1-f39-f3S
+P-392DX9-f39-dI--f3YNf39-f390j-9-dg1-f39-f3SP-392DX9-f391D-cNdw-3DX92j-cNdw-
+3DX9-f3WP9w13D-cNf3aP9w13D-cNf39-dY-3DXcP9w1-do-3DXcP9w1-f391j-cNdw-3DX92j-c
+Ndw-3DX9-f3WP9w13D-cNf3aP9w13D-cNf39-dY-3DXcP9w1-do-3DXcP9w1-f391j-cNdw-3DX9
+2j-cNdw-3DX9-f3WP9w13D-cNf3aP9w13D-cNf39-dY-3DXcP9w1-do-3DXcP9w1-f391j-cNdw-
+3DX92j-cNdw-3DX9-f3WP9w13D-cNf3aP9w13D-cNf39-dY-3DXcP9w1-do-3DXcP9w1-f391j-c
+Ndw-3DX92j-cNdw-3DX9-f3WP9w13D-cNf3aP9w13D-cNf39-dY-3DXcP9w1-do-3DXcP9w1-f39
+1j-cNdw-3DX92j-cNdw-3DX9-f3WP9w13D-cNf3aP9w13D-cNf39-dY-3DXcP9w1-do-3DXcP9w1
+-f391j-cNdw-3DX92j-cNdw-3DX9-f3WP9w13D-cNf3aP9w13D-cNf39-dY-3DXcP9w1-do-3DXc
+P9w1-f391j-cNdw-3DX92j-cNdw-3DX9-f3WP9w13D-cNf3aP9w13D-cNf39-dY-3DXcP9w1-do-
+3DXcP9w1-f391j-cNdw-3DX92j-cNdw-3DX9-f3WP9w13D-cNf3aP9w13D-cNf39-dY-3DXcP9w1
+-do-3DXcP9w1-f391j-cNdw-3DX92j-cNdw-3DX9-f3WP9w13D-cNf3aP9w13D-cNf39-dY-3DXc
+P9w1-do-3DXcP9w1-f391j-92jX92j-92jX9-f3WP-3aNf3aP-3aNf39-dY--do1-do--do1-f39
+1j-92jX92j-92jX9-f3WP-3aNf3aP-3aNf39-dY--do1-do--do1-f391j-92jX92j-92jX9-f3W
+P-3aNf3aP-3aNf39-dY--do1-do--do1-f391j-92jX92j-92jX9-f3WP-3aNf3aP-3aNf39-dY-
+-do1-do--do1-f391j-92jX92j-92jX9-f3WP-3aNf3aP-3aNf39-dY--do1-do--do1-f391j-9
+2jX92j-92jX9-f3WP-3aNf3aP-3aNf39-dY--do1-do--do1-f391j-92jX92j-92jX9-f3WP-3a
+Nf3aP-3aNf39-dY--do1-do--do1-f391j-92jX92j-92jX9-f3WP-3aNf3aP-3aNf39-dY--do1
+-do--do1-f391j-92jX92j-92jX9-f3WP-3aNf3aP-3aNf39-dY--do1-do--do1-f391j-92jX9
+2j-92jX9-f3WP-3aNf3aP-3aNf39-dY--do1-do--do1-f39-dQ--f3YNf39-f390j-9-dg1-f39
+-f3SP-392DX9-f39-dI--f3YNf39-f390j-9-dg1-f39-f3SP-392DX9-f39-dI--f3YNf39-f39
+0j-9-dg1-f39-f3SP-392DX9-f39-dI--f3YNf39-f390j-9-dg1-f39-f3SP-392DX9-f39-dI-
+-f3YNf39-f390j-9-dg1-f39-f3SP-392DX9-f39-dI--f3YNf39-f390j-9-dg1-f39-f3SP-39
+2DX9-f39-dI--f3YNf39-f390j-9-dg1-f39-f3SP-392DX9-f39-dI--f3YNf39-f390j-9-dg1
+-f39-f3SP-392DX9-f39-dI--f3YNf39-f390j-9-dg1-f39-f3SP-392DX9-f39-dI--f3YNf39
+-f390j-9-dg1-f39-f3SP-392DX9-f398j-cNfo-3DX6P9w1-f39-dQ-3DX6P9w1_j-cNf39-f3U
+P9w1_j-cNfo-3DX9-f391D-cNfo-3DX6P9w1-f39-dQ-3DX6P9w1_j-cNf39-f3UP9w1_j-cNfo-
+3DX9-f391D-cNfo-3DX6P9w1-f39-dQ-3DX6P9w1_j-cNf39-f3UP9w1_j-cNfo-3DX9-f391D-c
+Nfo-3DX6P9w1-f39-dQ-3DX6P9w1_j-cNf39-f3UP9w1_j-cNfo-3DX9-f391D-cNfo-3DX6P9w1
+-f39-dQ-3DX6P9w1_j-cNf39-f3UP9w1_j-cNfo-3DX9-f391D-cNfo-3DX6P9w1-f39-dQ-3DX6
+P9w1_j-cNf39-f3UP9w1_j-cNfo-3DX9-f391D-cNfo-3DX6P9w1-f39-dQ-3DX6P9w1_j-cNf39
+-f3UP9w1_j-cNfo-3DX9-f391D-cNfo-3DX6P9w1-f39-dQ-3DX6P9w1_j-cNf39-f3UP9w1_j-c
+Nfo-3DX9-f391D-cNfo-3DX6P9w1-f39-dQ-3DX6P9w1_j-cNf39-f3UP9w1_j-cNfo-3DX9-f39
+1D-cNfo-3DX6P9w1-f39-dQ-3DX6P9w1_j-cNf39-f3UP9w1_j-cNfo-3DX9-f391D-92jXcP-3a
+Nf39-f3UP-3aNdw--do1-f39-dQ--do13D-92jX9-f391D-92jXcP-3aNf39-f3UP-3aNdw--do1
+-f39-dQ--do13D-92jX9-f391D-92jXcP-3aNf39-f3UP-3aNdw--do1-f39-dQ--do13D-92jX9
+-f391D-92jXcP-3aNf39-f3UP-3aNdw--do1-f39-dQ--do13D-92jX9-f391D-92jXcP-3aNf39
+-f3UP-3aNdw--do1-f39-dQ--do13D-92jX9-f391D-92jXcP-3aNf39-f3UP-3aNdw--do1-f39
+-dQ--do13D-92jX9-f391D-92jXcP-3aNf39-f3UP-3aNdw--do1-f39-dQ--do13D-92jX9-f39
+1D-92jXcP-3aNf39-f3UP-3aNdw--do1-f39-dQ--do13D-92jX9-f391D-92jXcP-3aNf39-f3U
+P-3aNdw--do1-f39-dQ--do13D-92jX9-f391D-92jXcP-3aNf39yf4dK1M1-f3IP-3aNdw--do1
+-f3JPyg1-f3HP-3aNdw--do1-f3JAAAAAAAAAAE=
+:: lat_keys.lua
+b64$LS1bW3BvZF9mb3JtYXQ9InJhdyIsY3JlYXRlZD0iMjAyNi0wNC0xNCAwNToxMzoyNiIsbW9k
+aWZpZWQ9IjIwMjYtMDQtMTkgMjI6MjA6MzkiLHJldmlzaW9uPTIwNF1dCmxvY2FsIGxlZnQgPSA3
+NQpsb2NhbCBwcmltYXJ5X2tleV9jb2wgPSBuaWwKbG9jYWwgc2Vjb25kYXJ5X2tleV9jb2wgPSBu
+aWwKbG9jYWwgY2xzX2J0bl9wcmltYXJ5X2NvbCA9IG5pbApsb2NhbCBjbHNfYnRuX3NlY29uZGFy
+eV9jb2wgPSBuaWwKbG9jYWwga2V5X3pfcG9zID0gLTIwCmxvY2FsIGZ1bmN0aW9uIGJzX3RleHQo
+c3RyKQogICAgaWYgbm90IHN0ciBvciAjc3RyID09IDAgdGhlbiByZXR1cm4gIiIgZW5kCiAgICBs
+b2NhbCBpID0gI3N0cgogICAgd2hpbGUgaSA_IDEgYW5kIChvcmQoc3RyLCBpKSAmIDB4YzApID09
+IDB4ODAgZG8KICAgICAgICBpID0gaSAtIDEKICAgIGVuZAogICAgcmV0dXJuIHN1YihzdHIsIDEs
+IGkgLSAxKQplbmQKYnV0dG9uOm5ldwooCglsYXRfa2V5c19jYW52YXMsCgl7CgkJeD0wLAoJCXk9
+MCwKCQl6PTAKCX0sCgl7CgkJeD0wLAoJCXk9MAoJfSwKCTE5KzE2LAoJMTYsCglmdW5jdGlvbigp
+IHZlcmlmaWNhdGlvbl9jYW52YXM6YWN0aXZhdGUoKSBlbmQsCgluaWwsCgl7InNodXRkb3duIn0s
+CgluaWwKKQpidXR0b246bmV3CigKCWxhdF9rZXlzX2NhbnZhcywKCXsKCQl4PTE5KzE2LAoJCXk9
+MCwKCQl6PTUKCX0sCgl7CgkJeD0wLAoJCXk9MAoJfSwKCTQ4MC0oMTkrMTYpLAoJMTYsCglmdW5j
+dGlvbigpCgllbmQsCgluaWwsCgl7IiJ9LAoJbmlsLAoJZmFsc2UKKQpidXR0b246bmV3CigKCWxh
+dF9rZXlzX2NhbnZhcywKCXsKCQl4PWxlZnQsCgkJeT0xMjAsCgkJej0xNQoJfSwKCXsKCQl4PTAs
+CgkJeT0wCgl9LAoJMzMwLAoJMTUwLAoJZnVuY3Rpb24oKQoJZW5kLAoJc2Vjb25kYXJ5X2tleV9j
+b2wsCgl7IiJ9LAoJc2Vjb25kYXJ5X2tleV9jb2wsCglmYWxzZQopCmJ1dHRvbjpuZXcobGF0X2tl
+eXNfY2FudmFzLCB7eD1sZWZ0KzMwMCwgeT05MCwgej1rZXlfel9wb3N9LCB7eD0wLHk9MH0sIDMw
+LCAzMCwKZnVuY3Rpb24oKQoJZm9yIGwgaW4gYWxsKGRhdGEubG9ncykgZG8KCQlpZiBsLmxibCA9
+PSBpbnB1dF9zdHIgdGhlbgoJCQlzYXZlX2RhdGEubG9nX2xibF92YWxzW3NhdmVfZGF0YS5udW1f
+b2ZfbG9ncysxLWwuaW5keF0gPSBsLmxibFsxXQoJCWVuZAoJZW5kCglzdG9yZShzYXZlX2ZpbGUs
+IHNhdmVfZGF0YSkKCglsb2dzX2NhbnZhczpzd2l0Y2hfdG8oKQoJaW5wdXRfc3RyID0gbmlsCmVu
+ZCwgY2xzX2J0bl9wcmltYXJ5X2NvbCwgeyJzYXZlIn0sIGNsc19idG5fc2Vjb25kYXJ5X2NvbCkK
+CmxvY2FsIGtleXNfcm93XzEyMCA9IHsiMSIsIjIiLCIzIiwiNCIsIjUiLCI2IiwiNyIsIjgiLCI5
+IiwiMCJ9CmZvciBpLCBjaGFyIGluIGlwYWlycyhrZXlzX3Jvd18xMjApIGRvCiAgICBidXR0b246
+bmV3KGxhdF9rZXlzX2NhbnZhcywge3g9bGVmdCsoaS0xKSozMCwgeT0xMjAsIHo9a2V5X3pfcG9z
+fSwge3g9MCx5PTB9LCAzMCwgMzAsIGZ1bmN0aW9uKCkgcmR0eHQoY2hhcikgZW5kLCBwcmltYXJ5
+X2tleV9jb2wsIHtjaGFyfSwgc2Vjb25kYXJ5X2tleV9jb2wpCmVuZApidXR0b246bmV3KGxhdF9r
+ZXlzX2NhbnZhcywge3g9bGVmdCszMDAsIHk9MTIwLCB6PWtleV96X3Bvc30sIHt4PTAseT0wfSwg
+MzAsIDMwLCBmdW5jdGlvbigpIGlucHV0X3N0clsxXSA9IGJzX3RleHQoaW5wdXRfc3RyWzFdKSBl
+bmQsIHByaW1hcnlfa2V5X2NvbCwgeyJiYWNrIn0sIHNlY29uZGFyeV9rZXlfY29sKQoKbG9jYWwg
+a2V5c19yb3dfMTUwID0geyJxIiwidyIsImUiLCJyIiwidCIsInkiLCJ1IiwiaSIsIm8iLCJwIn0K
+Zm9yIGksIGNoYXIgaW4gaXBhaXJzKGtleXNfcm93XzE1MCkgZG8KICAgIGJ1dHRvbjpuZXcobGF0
+X2tleXNfY2FudmFzLCB7eD1sZWZ0KzE1KyhpLTEpKjMwLCB5PTE1MCwgej1rZXlfel9wb3N9LCB7
+eD0wLHk9MH0sIDMwLCAzMCwgZnVuY3Rpb24oKSByZHR4dChjaGFyKSBlbmQsIHByaW1hcnlfa2V5
+X2NvbCwge2NoYXJ9LCBzZWNvbmRhcnlfa2V5X2NvbCkKZW5kCgpsb2NhbCBrZXlzX3Jvd18xODAg
+PSB7ImEiLCJzIiwiZCIsImYiLCJnIiwiaCIsImoiLCJrIiwibCJ9CmZvciBpLCBjaGFyIGluIGlw
+YWlycyhrZXlzX3Jvd18xODApIGRvCiAgICBidXR0b246bmV3KGxhdF9rZXlzX2NhbnZhcywge3g9
+bGVmdCszMCsoaS0xKSozMCwgeT0xODAsIHo9a2V5X3pfcG9zfSwge3g9MCx5PTB9LCAzMCwgMzAs
+IGZ1bmN0aW9uKCkgcmR0eHQoY2hhcikgZW5kLCBwcmltYXJ5X2tleV9jb2wsIHtjaGFyfSwgc2Vj
+b25kYXJ5X2tleV9jb2wpCmVuZAoKbG9jYWwga2V5c19yb3dfMjEwID0geyJ6IiwieCIsImMiLCJ2
+IiwiYiIsIm4iLCJtIn0KZm9yIGksIGNoYXIgaW4gaXBhaXJzKGtleXNfcm93XzIxMCkgZG8KICAg
+IGJ1dHRvbjpuZXcobGF0X2tleXNfY2FudmFzLCB7eD1sZWZ0KzYwKyhpLTEpKjMwLCB5PTIxMCwg
+ej1rZXlfel9wb3N9LCB7eD0wLHk9MH0sIDMwLCAzMCwgZnVuY3Rpb24oKSByZHR4dChjaGFyKSBl
+bmQsIHByaW1hcnlfa2V5X2NvbCwge2NoYXJ9LCBzZWNvbmRhcnlfa2V5X2NvbCkKZW5kCgpidXR0
+b246bmV3KGxhdF9rZXlzX2NhbnZhcywge3g9bGVmdCs2MCwgeT0yNDAsIHo9a2V5X3pfcG9zfSwg
+e3g9MCx5PTB9LCAyMTAsIDMwLCBmdW5jdGlvbigpIHJkdHh0KCIgIikgZW5kLCBwcmltYXJ5X2tl
+eV9jb2wsIHsiIn0sIHNlY29uZGFyeV9rZXlfY29sKQpidXR0b246bmV3KGxhdF9rZXlzX2NhbnZh
+cywge3g9bGVmdCsyNzAsIHk9MjQwLCB6PWtleV96X3Bvc30sIHt4PTAseT0wfSwgNjAsIDMwLCBm
+dW5jdGlvbigpIGN5cl9rZXlzX3RleHRib3gubGJsID0gbGF0X2tleXNfdGV4dGJveC5sYmwgY3ly
+X2tleXNfY2FudmFzOnN3aXRjaF90bygpIGVuZCwgcHJpbWFyeV9rZXlfY29sLCB7ItGA0YMifSwg
+c2Vjb25kYXJ5X2tleV9jb2wpCgpsYXRfa2V5c190ZXh0Ym94ID0gYnV0dG9uOm5ldwooCglsYXRf
+a2V5c19jYW52YXMsCgl7CgkJeD00ODAsCgkJeT0yNzAsCgkJej0wCgl9LAoJewoJCXg9MCwKCQl5
+PTAKCX0sCgkzMDAsCgkzMCwKCWZ1bmN0aW9uKCkKCWVuZCwKCW5pbCwKCW5pbCwKCW5pbCwKCWZh
+bHNlCik=
+:: main.lua
+b64$LS1bW3BvZF9mb3JtYXQ9InJhdyIsY3JlYXRlZD0iMjAyNi0wNC0xMSAwMzo1ODozNSIsbW9k
+aWZpZWQ9IjIwMjYtMDQtMjAgMTk6MDU6MDMiLHJldmlzaW9uPTU0MzFdXQppbmNsdWRlICIvc3lz
+dGVtL2xpYi9ndWkubHVhIgppbmNsdWRlICJ4dHJhcy5sdWEiCmluY2x1ZGUgInQvdF9tYWluLmx1
+YSIKaW5jbHVkZSAic291cmNlLmx1YSIKaW5jbHVkZSAibGF1bmNoX2FuaW0ubHVhIgoKZnVuY3Rp
+b24gZHQoKQoJbG9jYWwgcmVzdWx0ID0gZGF0ZSgpCglpZiBwb3N0X2JsYWNrX3NjcmVlbiB0aGVu
+CgkJcmVzdWx0ID0gZGF0ZShuaWwsIG5pbCwgMzcwMDAwKQoJZW5kCglyZXR1cm4gcmVzdWx0CmVu
+ZAoKY2FudmFzID0ge30KY2FudmFzLl9faW5kZXggPSBjYW52YXMKZnVuY3Rpb24gY2FudmFzOm5l
+dyhlbHMpCglsb2NhbCBpbnN0YW5jZSA9IHt9CglpbnN0YW5jZS5lbHMgPSBlbHMKCWFkZChkYXRh
+LmNhbnZhc2VzLCBpbnN0YW5jZSkKCXNldG1ldGF0YWJsZShpbnN0YW5jZSwgY2FudmFzKQoJcmV0
+dXJuIGluc3RhbmNlCmVuZApmdW5jdGlvbiBjYW52YXM6YWN0aXZhdGUoKQoJbG9jYWwgaXNfbWlz
+c2luZyA9IHRydWUKCWZvciBjIGluIGFsbChhY3RpdmVfY2FudmFzZXMpIGRvCgkJaWYgYyA9PSBz
+ZWxmIHRoZW4KCQkJaXNfbWlzc2luZyA9IGZhbHNlCgkJZW5kCgllbmQKCWlmIGlzX21pc3Npbmcg
+dGhlbgoJCWFkZChhY3RpdmVfY2FudmFzZXMsIHNlbGYpCgllbmQKZW5kCmZ1bmN0aW9uIGNhbnZh
+czpkZWFjdGl2YXRlKCkKCWRlbChhY3RpdmVfY2FudmFzZXMsIHNlbGYpCmVuZApmdW5jdGlvbiBj
+YW52YXM6c3dpdGNoX3RvKCkKCWFjdGl2ZV9jYW52YXNlcyA9IHtzZWxmfQplbmQKZnVuY3Rpb24g
+Y2FudmFzOnVwZGF0ZSgpCglzb3J0KHNlbGYuZWxzKQoJZm9yIGVsIGluIGFsbChzZWxmLmVscykg
+ZG8KCQllbDp1cGRhdGUoKQoJZW5kCgkKCWxvY2FsIHBzaGRfYnRucyA9IHt9Cglmb3IgYiBpbiBh
+bGwoc2VsZi5lbHMpIGRvCgkJaWYgZ2V0bWV0YXRhYmxlKGIpID09IGJ1dHRvbiB0aGVuCgkJCWlm
+IGI6cHVzaGVkKCkgdGhlbgoJCQkJYWRkKHBzaGRfYnRucywgYikKCQkJZW5kCgkJZW5kCgllbmQK
+CXNvcnQocHNoZF9idG5zKQoJbG9jYWwgX2J0biA9IHBzaGRfYnRuc1sjcHNoZF9idG5zXQoJaWYg
+X2J0biB0aGVuCgkJcHJldl9tYiA9IDEKCQlfYnRuLmFjdCgpCgllbmQKZW5kCmZ1bmN0aW9uIGNh
+bnZhczpkcmF3KCkKCWZvciBlbCBpbiBhbGwoc2VsZi5lbHMpIGRvCgkJZWw6ZHJhdygpCgllbmQK
+ZW5kCmZ1bmN0aW9uIGNhbnZhczphZGRfZWxzKGVscykKCWZvciBlbCBpbiBhbGwoZWxzKSBkbwoJ
+CXNlbGY6YWRkX2VsKGVsKQoJZW5kCmVuZApmdW5jdGlvbiBjYW52YXM6YWRkX2VsKGVsKQoJYWRk
+KHNlbGYuZWxzLCBlbCkKZW5kCmZ1bmN0aW9uIGNhbnZhczpkZWxfZWwoZWwpCglkZWwoc2VsZi5l
+bHMsIGVsKQplbmQKCnZfc2xpZGVyID0ge30Kdl9zbGlkZXIuX19pbmRleCA9IHZfc2xpZGVyCmZ1
+bmN0aW9uIHZfc2xpZGVyOm5ldyhjbnZzLCBwb3MsIHZhbHVlLCB3LCBoLCBiZ19jb2wsIGZnX2Nv
+bCkKCWxvY2FsIGluc3RhbmNlID0ge30KCWNudnM6YWRkX2VsKGluc3RhbmNlKQoJaW5zdGFuY2Uu
+cG9zID0gcG9zCglpbnN0YW5jZS52YWx1ZSA9IHZhbHVlCglpbnN0YW5jZS53ID0gdwoJaW5zdGFu
+Y2UuaCA9IGgKCWluc3RhbmNlLmJnX2NvbCA9IGJnX2NvbAoJaW5zdGFuY2UuZmdfY29sID0gZmdf
+Y29sCglzZXRtZXRhdGFibGUoaW5zdGFuY2UsIHZfc2xpZGVyKQoJcmV0dXJuIGluc3RhbmNlCmVu
+ZApmdW5jdGlvbiB2X3NsaWRlcjpwdXNoZWQoKQoJbG9jYWwgbXgsIG15LCBtYiA9IG1vdXNlKCkK
+CWlmCgkJc2VsZi5wb3MueCA8PSBteCBhbmQKCQlteCA8PSBzZWxmLnBvcy54ICsgc2VsZi53IGFu
+ZAoJCXNlbGYucG9zLnkgPD0gbXkgYW5kCgkJbXkgPD0gc2VsZi5wb3MueSArIHNlbGYuaCBhbmQK
+CQltYiA_IDAgdGhlbiByZXR1cm4gdHJ1ZQoJZW5kCglyZXR1cm4gZmFsc2UKZW5kCmZ1bmN0aW9u
+IHZfc2xpZGVyOnVwZGF0ZSgpCglpZiBzZWxmOnB1c2hlZCgpCgkJdGhlbgoJCWxvY2FsIG14LCBt
+eSwgbWIgPSBtb3VzZSgpCgkJc2VsZi52YWx1ZSA9IChteSAtIHNlbGYucG9zLnkgLSBzZWxmLncv
+MikqMTAwIC8gKChzZWxmLmgtc2VsZi53KSoxMDApCgkJaWYgc2VsZi52YWx1ZSA8IDAKCQkJdGhl
+biBzZWxmLnZhbHVlID0gMAoJCQllbmQKCQlpZiBzZWxmLnZhbHVlID4gMQoJCQl0aGVuIHNlbGYu
+dmFsdWUgPSAxCgkJCWVuZAoJCWVuZAplbmQKZnVuY3Rpb24gdl9zbGlkZXI6ZHJhdygpCglyZWN0
+ZmlsbAoJKAoJCXNlbGYucG9zLngsCgkJc2VsZi5wb3MueSwKCQlzZWxmLnBvcy54K3NlbGYudy0x
+LAoJCXNlbGYucG9zLnkrc2VsZi5oLTEsCgkJc2VsZi5iZ19jb2wKCSkKCXJlY3RmaWxsCgkoCgkJ
+c2VsZi5wb3MueCwKCQlzZWxmLnBvcy55K2ZscihzZWxmLnZhbHVlKihzZWxmLmgtc2VsZi53KSsw
+LjUpLAoJCXNlbGYucG9zLngrc2VsZi53LTEsCgkJc2VsZi5wb3MueStmbHIoc2VsZi52YWx1ZSoo
+c2VsZi5oLXNlbGYudykrMC41KStzZWxmLnctMSwKCQlzZWxmLmJnX2NvbAoJKQoJcmVjdGZpbGwK
+CSgKCQlzZWxmLnBvcy54KzEsCgkJc2VsZi5wb3MueStmbHIoc2VsZi52YWx1ZSooc2VsZi5oLXNl
+bGYudykrMC41KSsxLAoJCXNlbGYucG9zLngrc2VsZi53LTEtMSwKCQlzZWxmLnBvcy55K2Zscihz
+ZWxmLnZhbHVlKihzZWxmLmgtc2VsZi53KSswLjUpK3NlbGYudy0xLTEsCgkJc2VsZi5mZ19jb2wK
+CSkKZW5kCgpoX3NsaWRlciA9IHt9Cmhfc2xpZGVyLl9faW5kZXggPSBoX3NsaWRlcgpmdW5jdGlv
+biBoX3NsaWRlcjpuZXcoY252cywgcG9zLCB2YWx1ZSwgdywgaCwgYmdfY29sLCBmZ19jb2wpCgls
+b2NhbCBpbnN0YW5jZSA9IHt9CgljbnZzOmFkZF9lbChpbnN0YW5jZSkKCWluc3RhbmNlLnBvcyA9
+IHBvcwoJaW5zdGFuY2UudmFsdWUgPSB2YWx1ZQoJaW5zdGFuY2UudyA9IHcKCWluc3RhbmNlLmgg
+PSBoCglpbnN0YW5jZS5iZ19jb2wgPSBiZ19jb2wKCWluc3RhbmNlLmZnX2NvbCA9IGZnX2NvbAoJ
+c2V0bWV0YXRhYmxlKGluc3RhbmNlLCBoX3NsaWRlcikKCXJldHVybiBpbnN0YW5jZQplbmQKZnVu
+Y3Rpb24gaF9zbGlkZXI6cHVzaGVkKCkKCWxvY2FsIG14LCBteSwgbWIgPSBtb3VzZSgpCglpZgoJ
+CXNlbGYucG9zLnggPD0gbXggYW5kCgkJbXggPD0gc2VsZi5wb3MueCArIHNlbGYudyBhbmQKCQlz
+ZWxmLnBvcy55IDw9IG15IGFuZAoJCW15IDw9IHNlbGYucG9zLnkgKyBzZWxmLmggYW5kCgkJbWIg
+PiAwIHRoZW4gcmV0dXJuIHRydWUKCWVuZAoJcmV0dXJuIGZhbHNlCmVuZApmdW5jdGlvbiBoX3Ns
+aWRlcjp1cGRhdGUoKQoJaWYgc2VsZjpwdXNoZWQoKQoJCXRoZW4KCQlsb2NhbCBteCwgbXksIG1i
+ID0gbW91c2UoKQoJCXNlbGYudmFsdWUgPSAobXggLSBzZWxmLnBvcy54IC0gc2VsZi5oLzIpKjEw
+MCAvICgoc2VsZi53LXNlbGYuaCkqMTAwKQoJCWlmIHNlbGYudmFsdWUgPCAwCgkJCXRoZW4gc2Vs
+Zi52YWx1ZSA9IDAKCQkJZW5kCgkJaWYgc2VsZi52YWx1ZSA_IDEKCQkJdGhlbiBzZWxmLnZhbHVl
+ID0gMQoJCQllbmQKCQllbmQKZW5kCmZ1bmN0aW9uIGhfc2xpZGVyOmRyYXcoKQoJcmVjdGZpbGwK
+CSgKCQlzZWxmLnBvcy54LAoJCXNlbGYucG9zLnksCgkJc2VsZi5wb3MueCtzZWxmLnctMSwKCQlz
+ZWxmLnBvcy55K3NlbGYuaC0xLAoJCXNlbGYuYmdfY29sCgkpCglyZWN0ZmlsbAoJKAoJCXNlbGYu
+cG9zLngrZmxyKHNlbGYudmFsdWUqKHNlbGYudy1zZWxmLmgpKzAuNSksCgkJc2VsZi5wb3MueSwK
+CQlzZWxmLnBvcy54K3NlbGYuaCtmbHIoc2VsZi52YWx1ZSooc2VsZi53LXNlbGYuaCkrMC41KS0x
+LAoJCXNlbGYucG9zLnkrc2VsZi5oLTEsCgkJc2VsZi5mZ19jb2wKCSkKZW5kCgpsaXN0X3RhaWwg
+PSB7fQpsaXN0X3RhaWwuX19pbmRleCA9IGxpc3RfdGFpbApmdW5jdGlvbiBsaXN0X3RhaWw6bmV3
+KGNudnMsIHBvcykKCWxvY2FsIGluc3RhbmNlID0ge30KCWNudnM6YWRkX2VsKGluc3RhbmNlKQoJ
+aW5zdGFuY2UucG9zID0gcG9zCglpbnN0YW5jZS5pbmR4ID0gI2RhdGEuaGFiaXRzKzEKCWluc3Rh
+bmNlLm1haW5fYnRuID0KCWJ1dHRvbjpuZXcKCSgKCQljbnZzLAoJCWluc3RhbmNlLnBvcywKCQl7
+CgkJCXg9NDUsCgkJCXk9MAoJCX0sCgkJMjQwLAoJCTQ1LAoJCWZ1bmN0aW9uKCkKCQkJaWYgbm90
+IGZyb3plbiB0aGVuCgkJCQloYWJpdDpuZXcKCQkJCSgKCQkJCQljbnZzLAoJCQkJCXsKCQkJCQkJ
+eD0wLAoJCQkJCQl5PTAsCgkJCQkJCXo9MTAKCQkJCQl9LAoJCQkJCXsibmV3IGhhYml0In0sCgkJ
+CQkJeyIxMDAifSwKCQkJCQkjZGF0YS5oYWJpdHMKCQkJCSkKCQkJCWluc3RhbmNlLmluZHggKz0g
+MQoJCQkJCgkJCQlzYXZlX2RhdGEubnVtX29mX2hhYnMgKz0gMQoJCQkJYWRkKHNhdmVfZGF0YS5o
+YWJfZXhwX3ZhbHMsICIxMDAiKQoJCQkJYWRkKHNhdmVfZGF0YS5oYWJfbGJsX3ZhbHMsICJuZXcg
+aGFiaXQiKQoJCQkJc3RvcmUoc2F2ZV9maWxlLCBzYXZlX2RhdGEpCgkJCWVuZAoJCWVuZCwKCQkx
+NywKCQl7ImNyZWF0ZSBhIGhhYml0In0sCgkJMTkKCSkKCWluc3RhbmNlLmVkaXRfYnRuID0KCWJ1
+dHRvbjpuZXcKCSgKCQljbnZzLAoJCWluc3RhbmNlLnBvcywKCQl7CgkJCXg9MCwKCQkJeT0wCgkJ
+fSwKCQk0NSwKCQk0NSwKCQlmdW5jdGlvbigpCgkJCWZyZWV6ZSgpCgkJCXNhdmVfZGF0YS5mcm96
+ZW4gPSB0cnVlCgkJCXN0b3JlKHNhdmVfZmlsZSwgc2F2ZV9kYXRhKQoJCWVuZCwKCQkxNywKCQl7
+ImZyZWV6ZSJ9LAoJCTE5CgkpCglhZGQoZGF0YS5lbGVtZW50cywgaW5zdGFuY2UpCglhZGQoZGF0
+YS5oYWJpdHMsIGluc3RhbmNlKQoJdXBkYXRlX2xhc3Rfcm93X3BvcygpCglzZXRtZXRhdGFibGUo
+aW5zdGFuY2UsIGxpc3RfdGFpbCkKCXJldHVybiBpbnN0YW5jZQplbmQKZnVuY3Rpb24gbGlzdF90
+YWlsOnVwZGF0ZSgpCglsb2NhbCBfY291bnQgPSAjZGF0YS5oYWJpdHMtNAoJaWYgX2NvdW50IDwg
+MAoJCXRoZW4gX2NvdW50ID0gMAoJCWVuZAoJc2VsZi5wb3MueCA9IDAKCXNlbGYucG9zLnkgPSBz
+ZWxmLmluZHgqNDUtaGFiaXRzX3NsaWRlci52YWx1ZSooNDUqKF9jb3VudCkpCmVuZApmdW5jdGlv
+biBsaXN0X3RhaWw6ZHJhdygpCmVuZApmdW5jdGlvbiBsaXN0X3RhaWw6ZGVzdHJveShjbnZzKQoJ
+bG9jYWwgb2JqcyA9IHsKCQlzZWxmLm1haW5fYnRuLAoJCXNlbGYuZWRpdF9idG4sCgkJc2VsZgoJ
+fQoKCWZvciBvIGluIGFsbChvYmpzKSBkbwoJCWRlbChkYXRhLmVsZW1lbnRzLCBvKQoJCWRlbChk
+YXRhLmJ1dHRvbnMsIG8pCgkJZGVsKGRhdGEuaGFiaXRzLCBvKQoJCWRlbChkYXRhLmxvZ3MsIG8p
+CgkJZGVsKGRhdGEuYmFycywgbykKCQljbnZzOmRlbF9lbChvKQoJZW5kCgkKCWZvciBrLCB2IGlu
+IHBhaXJzKHNlbGYpIGRvCgkJc2VsZltrXSA9IG5pbAoJZW5kCmVuZApmdW5jdGlvbiBmcmVlemUo
+KQoJaW5wdXRfc3RyID0gbmlsCglmcm96ZW4gPSB0cnVlCglpZiBub3Qgc2F2ZV9kYXRhLmZyb3pl
+biB0aGVuCgkJbG9jYWwgdGFpbCA9IG5pbAoJCWZvciBoIGluIGFsbChkYXRhLmhhYml0cykgZG8K
+CQkJaWYgaC5pbmR4ID09ICNkYXRhLmhhYml0cyB0aGVuIHRhaWwgPSBoIGVuZAoJCWVuZAoJCXRh
+aWw6ZGVzdHJveShoYWJpdHNfY2FudmFzKQoJZW5kCglmb3IgaCBpbiBhbGwoZGF0YS5oYWJpdHMp
+IGRvCgkJaC5pbmR4X2J0bi5vZmZzZXQueCA9IC00NQoJCWgueHBfYnRuLm9mZnNldC54ID0gMAoJ
+CWgubWFpbl9idG4ub2Zmc2V0LnggPSA0NQoJCWgubWFpbl9idG4udyA9IDI0MAoJCWguZWRpdF9i
+dG4ub2Zmc2V0LnggPSAtNDUKCQloLmRlbF9idG4ub2Zmc2V0LnggPSAtNDUKCWVuZAplbmQKCmhh
+Yml0ID0ge30KaGFiaXQuX19pbmRleCA9IGhhYml0CmZ1bmN0aW9uIGhhYml0Om5ldyhjbnZzLCBw
+b3MsIGxibCwgeHAsIGluZHgpCglsb2NhbCBpbnN0YW5jZSA9IHt9CgljbnZzOmFkZF9lbChpbnN0
+YW5jZSkKCWluc3RhbmNlLnBvcyA9IHBvcwoJaW5zdGFuY2UubGJsID0gbGJsCglpbnN0YW5jZS54
+cCA9IHhwCglpbnN0YW5jZS5pbmR4ID0gaW5keAoJaW5zdGFuY2UuaW5keF9idG4gPQoJYnV0dG9u
+Om5ldwoJKAoJCWNudnMsCgkJaW5zdGFuY2UucG9zLAoJCXsKCQkJeD0wLAoJCQl5PTAKCQl9LAoJ
+CTQ1LAoJCTQ1LAoJCWZ1bmN0aW9uKCkKCQkJaWYgbm90IGZyb3plbiBhbmQgaW5zdGFuY2UuaW5k
+eCA_IDEgdGhlbgoJCQkJbG9jYWwgdGVtcCA9IHNhdmVfZGF0YS5oYWJfZXhwX3ZhbHNbaW5zdGFu
+Y2UuaW5keC0xXQoJCQkJc2F2ZV9kYXRhLmhhYl9leHBfdmFsc1tpbnN0YW5jZS5pbmR4LTFdID0g
+c2F2ZV9kYXRhLmhhYl9leHBfdmFsc1tpbnN0YW5jZS5pbmR4XQoJCQkJc2F2ZV9kYXRhLmhhYl9l
+eHBfdmFsc1tpbnN0YW5jZS5pbmR4XSA9IHRlbXAKCQkJCXRlbXAgPSBzYXZlX2RhdGEuaGFiX2xi
+bF92YWxzW2luc3RhbmNlLmluZHgtMV0KCQkJCXNhdmVfZGF0YS5oYWJfbGJsX3ZhbHNbaW5zdGFu
+Y2UuaW5keC0xXSA9IHNhdmVfZGF0YS5oYWJfbGJsX3ZhbHNbaW5zdGFuY2UuaW5keF0KCQkJCXNh
+dmVfZGF0YS5oYWJfbGJsX3ZhbHNbaW5zdGFuY2UuaW5keF0gPSB0ZW1wCgkJCQlzdG9yZShzYXZl
+X2ZpbGUsIHNhdmVfZGF0YSkKCQkJCQoJCQkJaWYgaW5zdGFuY2UuaW5keCA_IDEgdGhlbgoJCQkJ
+CWZvciBoIGluIGFsbChkYXRhLmhhYml0cykgZG8KCQkJCQkJaWYgaC5pbmR4ID09IGluc3RhbmNl
+LmluZHggLSAxIHRoZW4KCQkJCQkJCWguaW5keCArPSAxCgkJCQkJCWVuZAoJCQkJCWVuZAoJCQkJ
+CWluc3RhbmNlLmluZHggLT0gMQoJCQkJZW5kCgkJCWVuZAoJCWVuZCwKCQkxNywKCQl7Im1vdmUg
+dXAifSwKCQkxOQoJKQoJaW5zdGFuY2UueHBfYnRuID0KCWJ1dHRvbjpuZXcKCSgKCQljbnZzLAoJ
+CWluc3RhbmNlLnBvcywKCQl7CgkJCXg9NDUsCgkJCXk9MAoJCX0sCgkJNDUsCgkJNDUsCgkJZnVu
+Y3Rpb24oKQoJCQlpZiBub3QgZnJvemVuIHRoZW4KCQkJCW51bXBhZF90ZXh0Ym94LmxibCA9IHhw
+CgkJCQlpbnB1dF9zdHIgPSB4cAoJCQkJbnVtcGFkX2NhbnZhczpzd2l0Y2hfdG8oKQoJCQllbmQK
+CQllbmQsCgkJMTcsCgkJeHAsCgkJMTkKCSkKCWluc3RhbmNlLm1haW5fYnRuID0KCWJ1dHRvbjpu
+ZXcKCSgKCQljbnZzLAoJCWluc3RhbmNlLnBvcywKCQl7CgkJCXg9OTAsCgkJCXk9MAoJCX0sCgkJ
+MTA1LAoJCTQ1LAoJCWZ1bmN0aW9uKCkKLS0JCQl2YWx1ZSArPSBpbnN0YW5jZS54cFsxXQotLQkJ
+CWZvciBsIGluIGFsbChkYXRhLmxvZ3MpIGRvCi0tCQkJCWwuaW5keCArPSAxCi0tCQkJZW5kCi0t
+CQkJbG9nOm5ldwotLQkJCSgKLS0JCQkJbG9nc19jYW52YXMsCi0tCQkJCXsKLS0JCQkJCXg9MCwK
+LS0JCQkJCXk9MCwKLS0JCQkJCXo9MTAKLS0JCQkJfSwKLS0JCQkJe2luc3RhbmNlLmxibFsxXX0s
+Ci0tCQkJCXtpbnN0YW5jZS54cFsxXX0sCi0tCQkJCTEKLS0JCQkpCi0tCQkJCi0tCQkJc2F2ZV9k
+YXRhLm51bV9vZl9sb2dzICs9IDEKLS0JCQlhZGQoc2F2ZV9kYXRhLmxvZ19tcmtfdmFscywgdG9z
+dHJpbmcoZGF0ZSgpKSkKLS0JCQlhZGQoc2F2ZV9kYXRhLmxvZ19leHBfdmFscywgaW5zdGFuY2Uu
+eHBbMV0pCi0tCQkJYWRkKHNhdmVfZGF0YS5sb2dfbGJsX3ZhbHMsIGluc3RhbmNlLmxibFsxXSkK
+LS0JCQlzdG9yZShzYXZlX2ZpbGUsIHNhdmVfZGF0YSkKCQllbmQsCgkJMTcsCgkJbGJsLAoJCTE5
+CgkpCglpbnN0YW5jZS5lZGl0X2J0biA9CglidXR0b246bmV3CgkoCgkJY252cywKCQlpbnN0YW5j
+ZS5wb3MsCgkJewoJCQl4PTE5NSwKCQkJeT0wCgkJfSwKCQk0NSwKCQk0NSwKCQlmdW5jdGlvbigp
+CgkJCWlmIG5vdCBmcm96ZW4gdGhlbgoJCQkJbGF0X2tleXNfdGV4dGJveC5sYmwgPSBsYmwKCQkJ
+CWlucHV0X3N0ciA9IGxibAoJCQkJbGF0X2tleXNfY2FudmFzOnN3aXRjaF90bygpCgkJCWVuZAoJ
+CWVuZCwKCQkxNywKCQl7ImVkaXQifSwKCQkxOQoJKQoJaW5zdGFuY2UuZGVsX2J0biA9CglidXR0
+b246bmV3CgkoCgkJY252cywKCQlpbnN0YW5jZS5wb3MsCgkJewoJCQl4PTI0MCwKCQkJeT0wCgkJ
+fSwKCQk0NSwKCQk0NSwKCQlmdW5jdGlvbigpCgkJCWlmIG5vdCBmcm96ZW4gdGhlbgoJCQkJc2F2
+ZV9kYXRhLm51bV9vZl9oYWJzIC09IDEKCQkJCWRlbGkoc2F2ZV9kYXRhLmhhYl9leHBfdmFscywg
+aW5zdGFuY2UuaW5keCkKCQkJCWRlbGkoc2F2ZV9kYXRhLmhhYl9sYmxfdmFscywgaW5zdGFuY2Uu
+aW5keCkKCQkJCXN0b3JlKHNhdmVfZmlsZSwgc2F2ZV9kYXRhKQoJCQkJCgkJCQlmb3IgaCBpbiBh
+bGwoZGF0YS5oYWJpdHMpIGRvCgkJCQkJaWYgaC5pbmR4ID4gaW5zdGFuY2UuaW5keCB0aGVuCgkJ
+CQkJCWguaW5keCAtPSAxCgkJCQkJZW5kCgkJCQllbmQKCQkJCWluc3RhbmNlOmRlc3Ryb3koY252
+cykKCQkJZW5kCgkJZW5kLAoJCTE3LAoJCXsiZGVsIn0sCgkJMTkKCSkKCWFkZChkYXRhLmVsZW1l
+bnRzLCBpbnN0YW5jZSkKCWFkZChkYXRhLmhhYml0cywgaW5zdGFuY2UpCgl1cGRhdGVfbGFzdF9y
+b3dfcG9zKCkKCXNldG1ldGF0YWJsZShpbnN0YW5jZSwgaGFiaXQpCglyZXR1cm4gaW5zdGFuY2UK
+ZW5kCmZ1bmN0aW9uIGhhYml0OnVwZGF0ZSgpCglsb2NhbCBfY291bnQgPSAjZGF0YS5oYWJpdHMt
+NAoJaWYgX2NvdW50IDwgMAoJCXRoZW4gX2NvdW50ID0gMAoJCWVuZAoJc2VsZi5wb3MueCA9IDAK
+CXNlbGYucG9zLnkgPSBzZWxmLmluZHgqNDUtaGFiaXRzX3NsaWRlci52YWx1ZSooNDUqKF9jb3Vu
+dCkpCmVuZApmdW5jdGlvbiBoYWJpdDpkcmF3KCkKZW5kCmZ1bmN0aW9uIGhhYml0OmRlc3Ryb3ko
+Y252cykKCWxvY2FsIG9ianMgPSB7CgkJc2VsZi5pbmR4X2J0biwKCQlzZWxmLnhwX2J0biwKCQlz
+ZWxmLm1haW5fYnRuLAoJCXNlbGYuZWRpdF9idG4sCgkJc2VsZi5kZWxfYnRuLAoJCXNlbGYKCX0K
+Cglmb3IgbyBpbiBhbGwob2JqcykgZG8KCQlkZWwoZGF0YS5lbGVtZW50cywgbykKCQlkZWwoZGF0
+YS5idXR0b25zLCBvKQoJCWRlbChkYXRhLmhhYml0cywgbykKCQlkZWwoZGF0YS5sb2dzLCBvKQoJ
+CWNudnM6ZGVsX2VsKG8pCgllbmQKCQoJZm9yIGssIHYgaW4gcGFpcnMoc2VsZikgZG8KCQlzZWxm
+W2tdID0gbmlsCgllbmQKZW5kCgppbmNsdWRlICJvYmpzL2xvZy5sdWEiCmluY2x1ZGUgIm9ianMv
+bWVzc2FnZS5sdWEiCmluY2x1ZGUgIm9ianMvY29tcGVuc2F0aW9uLmx1YSIKCmJhciA9IHt9CmJh
+ci5fX2luZGV4ID0gYmFyCmZ1bmN0aW9uIGJhcjpuZXcoY252cywgcG9zLCBsYmwsIGxvZ19zZXQs
+IGluZHgpCglsb2NhbCBpbnN0YW5jZSA9IHt9CgljbnZzOmFkZF9lbChpbnN0YW5jZSkKCWluc3Rh
+bmNlLnBvcyA9IHBvcwoJaW5zdGFuY2UubGJsID0gbGJsCglpbnN0YW5jZS5sb2dfc2V0ID0gbG9n
+X3NldAoJaW5zdGFuY2UuaW5keCA9IGluZHgKCWluc3RhbmNlLmxvZ3MgPSBuaWwKCWluc3RhbmNl
+LmJhcl9idG4gPQoJYnV0dG9uOm5ldwoJKAoJCWNudnMsCgkJaW5zdGFuY2UucG9zLAoJCXsKCQkJ
+eD0wLAoJCQl5PTAKCQl9LAoJCTQ1LAoJCTQ1LAoJCWZ1bmN0aW9uKCkKCQllbmQsCgkJMTcsCgkJ
+bmlsLAoJCTE5CgkpCglpbnN0YW5jZS5sYmxfYnRuID0KCWJ1dHRvbjpuZXcKCSgKCQljbnZzLAoJ
+CWluc3RhbmNlLnBvcywKCQl7CgkJCXg9MCwKCQkJeT0wCgkJfSwKCQk0NSwKCQk5LAoJCWZ1bmN0
+aW9uKCkKCQllbmQsCgkJMTcsCgkJaW5zdGFuY2UubGJsLAoJCTE5CgkpCglhZGQoZGF0YS5lbGVt
+ZW50cywgaW5zdGFuY2UpCglhZGQoZGF0YS5iYXJzLCBpbnN0YW5jZSkKCXNldG1ldGF0YWJsZShp
+bnN0YW5jZSwgYmFyKQoJcmV0dXJuIGluc3RhbmNlCmVuZApmdW5jdGlvbiBiYXI6Z2V0X3ZhbHVl
+KCkKCXZhbHVlID0gMAoJZm9yIGwgaW4gYWxsKHNlbGYubG9nX3NldCkgZG8KCQlpZiBsIGFuZCBs
+LnhwIHRoZW4KCQkJdmFsdWUgKz0gbC54cFsxXQoJCWVuZAoJZW5kCglyZXR1cm4gdmFsdWUKZW5k
+CmZ1bmN0aW9uIGJhcjp1cGRhdGUoKQoJbG9jYWwgX2NvdW50ID0gI2RhdGEuYmFycy03CglpZiBf
+Y291bnQgPCAwCgkJdGhlbiBfY291bnQgPSAwCgkJZW5kCglzZWxmLnBvcy54ID0gMzMwLShzZWxm
+LmluZHgqNDUpKygxLXN0YXRpc3RpY3Nfc2xpZGVyLnZhbHVlKSpfY291bnQqNDUKCW1heF9zY29y
+ZSA9IDAuMDAxCglmb3IgYiBpbiBhbGwoZGF0YS5iYXJzKSBkbwoJCWlmIGI6Z2V0X3ZhbHVlKCkg
+PiBtYXhfc2NvcmUgdGhlbgoJCQltYXhfc2NvcmUgPSBiOmdldF92YWx1ZSgpCgkJZW5kCgllbmQK
+CXJhdGlvID0gKHNlbGY6Z2V0X3ZhbHVlKCkqMTAwKS8obWF4X3Njb3JlKjEwMCkKCXNlbGYucG9z
+LnkgPSA0NStmbHIoKCgxLXJhdGlvKSooMTcxLTQ1KSkrMC41KQoJc2VsZi5iYXJfYnRuLmggPSBm
+bHIoMTI3ICogcmF0aW8rMC41KQoJc2VsZi5sYmxfYnRuLm9mZnNldC55PTE3MS1zZWxmLnBvcy55
+CglzZWxmLmJhcl9idG4ubGJsID0ge3Rvc3RyaW5nKHNlbGY6Z2V0X3ZhbHVlKCkpfQplbmQKZnVu
+Y3Rpb24gYmFyOmRyYXcoKQplbmQKCm8gPSB7fQpvLl9faW5kZXggPSBvCmZ1bmN0aW9uIG86bmV3
+KHBvcywgZnJhbWVfaW5kZXgsIGNsciwgdGhpY2tuZXNzKQoJbG9jYWwgaW5zdGFuY2UgPSB7fQoJ
+aW5zdGFuY2UucG9zID0gcG9zCglpbnN0YW5jZS5mcmFtZV9pbmRleCA9IGZyYW1lX2luZGV4Cglp
+bnN0YW5jZS5jbHIgPSBjbHIKCWluc3RhbmNlLnRoaWNrbmVzcyA9IHRoaWNrbmVzcwoJaW5zdGFu
+Y2Uuc3BlZWQgPSAxCglpbnN0YW5jZS5kZWxldGVkID0gZmFsc2UKCXNldG1ldGF0YWJsZShpbnN0
+YW5jZSwgbykKCXJldHVybiBpbnN0YW5jZQplbmQKZnVuY3Rpb24gbzp0KCkKCXNlbGYuZnJhbWVf
+aW5kZXggKz0gMQoJaWYgc2VsZi5mcmFtZV9pbmRleCA_IDYwMCB0aGVuCgkJaWYgc2VsZi5kZWxl
+dGVkIHRoZW4KCQkJcmV0dXJuIG5pbAoJCWVsc2UKCQkJc2VsZi5mcmFtZV9pbmRleCA9IDAKCQll
+bmQKCWVuZAoJcmV0dXJuIHNlbGYuZnJhbWVfaW5kZXgKZW5kCmZ1bmN0aW9uIG86ZHJhdygpCgls
+b2NhbCBjdXJyX2ZyYW1lID0gc2VsZjp0KCkKCWlmIG5vdCBjdXJyX2ZyYW1lIHRoZW4gcmV0dXJu
+IGVuZAoJZm9yIGk9LShzZWxmLnRoaWNrbmVzcy0xKSwwIGRvCgkJcmFkaXVzID0gc2VsZi5zcGVl
+ZCpjdXJyX2ZyYW1lICsgaQoJCWlmIHJhZGl1cyA8IDAgdGhlbiByYWRpdXMgPSAwIGVuZAoJCWNp
+cmMoc2VsZi5wb3MueCxzZWxmLnBvcy55LCByYWRpdXMsIHNlbGYuY2xyKQoJZW5kCmVuZAoKYnV0
+dG9uID0ge30KYnV0dG9uLl9faW5kZXggPSBidXR0b24KZnVuY3Rpb24gYnV0dG9uOm5ldyhjbnZz
+LCBwb3MsIG9mZnNldCwgdywgaCwgYWN0LCBjb2wsIGxibCwgbGJsX2NvbCwgaXNfYWN0aXZlKQoJ
+bG9jYWwgaW5zdGFuY2UgPSB7fQoJY252czphZGRfZWwoaW5zdGFuY2UpCglpbnN0YW5jZS5wb3Mg
+PSBwb3MKCWluc3RhbmNlLm9mZnNldCA9IG9mZnNldAoJaW5zdGFuY2UudyA9IHcKCWluc3RhbmNl
+LmggPSBoCglpbnN0YW5jZS5hY3QgPSBhY3QKCWlmIGNvbCA9PSBuaWwgdGhlbgoJCWluc3RhbmNl
+LmNvbCA9IHByaW1hcnlfY29sb3IKCWVsc2UKCQlpbnN0YW5jZS5jb2wgPSBjb2wKCWVuZAoJaW5z
+dGFuY2UubGJsID0gbGJsCglpZiBsYmxfY29sID09IG5pbCB0aGVuCgkJaW5zdGFuY2UubGJsX2Nv
+bCA9IHNlY29uZGFyeV9jb2xvcgoJZWxzZQoJCWluc3RhbmNlLmxibF9jb2wgPSBsYmxfY29sCgll
+bmQKCWlmIGlzX2FjdGl2ZSA9PSBuaWwgdGhlbgoJCWluc3RhbmNlLmlzX2FjdGl2ZSA9IHRydWUK
+CWVsc2UKCQlpbnN0YW5jZS5pc19hY3RpdmUgPSBpc19hY3RpdmUKCWVuZAoJaWYgaW5zdGFuY2Uu
+aXNfYWN0aXZlID09IGZhbHNlIHRoZW4KCQlpZiBjb2wgPT0gbmlsIHRoZW4KCQkJaW5zdGFuY2Uu
+Y29sID0gc2Vjb25kYXJ5X2NvbG9yIGVuZAoJCWlmIGxibF9jb2wgPT0gbmlsIHRoZW4KCQkJaW5z
+dGFuY2UubGJsX2NvbCA9IHByaW1hcnlfY29sb3IgZW5kCgllbmQKCWFkZChkYXRhLmVsZW1lbnRz
+LCBpbnN0YW5jZSkKCWFkZChkYXRhLmJ1dHRvbnMsIGluc3RhbmNlKQoJc2V0bWV0YXRhYmxlKGlu
+c3RhbmNlLCBidXR0b24pCglyZXR1cm4gaW5zdGFuY2UKZW5kCmZ1bmN0aW9uIGJ1dHRvbjp4KCkK
+CXJldHVybiBzZWxmLnBvcy54ICsgc2VsZi5vZmZzZXQueAplbmQKZnVuY3Rpb24gYnV0dG9uOnko
+KQoJcmV0dXJuIHNlbGYucG9zLnkgKyBzZWxmLm9mZnNldC55CmVuZApmdW5jdGlvbiBidXR0b246
+aG92ZXIoKQoJbG9jYWwgbXgsIG15LCBtYiA9IG1vdXNlKCkKCWlmCgkJc2VsZjp4KCkgPD0gbXgg
+YW5kCgkJbXggPD0gc2VsZjp4KCkgKyBzZWxmLncgYW5kCgkJc2VsZjp5KCkgPD0gbXkgYW5kCgkJ
+bXkgPD0gc2VsZjp5KCkgKyBzZWxmLmggdGhlbiByZXR1cm4gdHJ1ZQoJZW5kCglyZXR1cm4gZmFs
+c2UKZW5kCmZ1bmN0aW9uIGJ1dHRvbjpob2xkKCkKCWxvY2FsIG14LCBteSwgbWIgPSBtb3VzZSgp
+CglpZgoJCXNlbGY6aG92ZXIoKSBhbmQgbWIgPiAwIHRoZW4gcmV0dXJuIHRydWUKCWVuZAoJcmV0
+dXJuIGZhbHNlCmVuZApmdW5jdGlvbiBidXR0b246cHVzaGVkKCkKCWlmIG5vdCBzZWxmLmlzX2Fj
+dGl2ZSB0aGVuIHJldHVybiBlbmQKCWxvY2FsIG14LCBteSwgbWIgPSBtb3VzZSgpCglpZgoJCXBy
+ZXZfbWIgPT0gMCBhbmQgc2VsZjpob2xkKCkgdGhlbiByZXR1cm4gdHJ1ZQoJZW5kCglyZXR1cm4g
+ZmFsc2UKZW5kCmZ1bmN0aW9uIGJ1dHRvbjp1cGRhdGUoKQplbmQKZnVuY3Rpb24gYnV0dG9uOmRy
+YXcoKQoJLS1pbmFjdGl2ZQoJaWYgaXNfYWN0aXZlID09IGZhbHNlIHRoZW4KCQktLXN0cm9rZQoJ
+CXJlY3RmaWxsCgkJKAoJCQlzZWxmOngoKSwKCQkJc2VsZjp5KCksCgkJCXNlbGY6eCgpK3NlbGYu
+dy0xLAoJCQlzZWxmOnkoKStzZWxmLmgtMSwKCQkJc2VsZi5sYmxfY29sCgkJKQoJCS0tZmlsbAoJ
+CXJlY3RmaWxsCgkJKAoJCQlzZWxmOngoKSsxLAoJCQlzZWxmOnkoKSsxLAoJCQlzZWxmOngoKStz
+ZWxmLnctMiwKCQkJc2VsZjp5KCkrc2VsZi5oLTIsCgkJCXNlbGYuY29sCgkJKQoJCS0tbmFtZQoJ
+CWlmIHNlbGYubGJsIHRoZW4KCQkJd3JpdGUKCQkJKAoJCQkJc2VsZi5sYmxbMV0sCgkJCQlzZWxm
+OngoKSsyLAoJCQkJc2VsZjp5KCkrMiwKCQkJCXNlbGYubGJsX2NvbAoJCQkpCgkJZW5kCgllbmQK
+CS0tYWN0aXZlLWlkbGUKCWlmIGlzX2FjdGl2ZSA9PSB0cnVlIGFuZCBub3Qgc2VsZjpob3Zlcigp
+IHRoZW4KCQktLXN0cm9rZQoJCXJlY3RmaWxsCgkJKAoJCQlzZWxmOngoKSwKCQkJc2VsZjp5KCks
+CgkJCXNlbGY6eCgpK3NlbGYudy0xLAoJCQlzZWxmOnkoKStzZWxmLmgtMSwKCQkJc2VsZi5sYmxf
+Y29sCgkJKQoJCS0tdG9wCgkJcmVjdGZpbGwKCQkoCgkJCXNlbGY6eCgpKzEsCgkJCXNlbGY6eSgp
+KzEsCgkJCXNlbGY6eCgpK3NlbGYudy0yLAoJCQlzZWxmOnkoKSsxKzYsCgkJCXNlbGYuY29sCgkJ
+KQoJCS0tc2lkZQoJCXJlY3RmaWxsCgkJKAoJCQlzZWxmOngoKSsxLAoJCQlzZWxmOnkoKSsxKzgs
+CgkJCXNlbGY6eCgpK3NlbGYudy0yLAoJCQlzZWxmOnkoKStzZWxmLmgtMiwKCQkJc2VsZi5jb2wK
+CQkpCgkJLS1uYW1lCgkJaWYgc2VsZi5sYmwgdGhlbgoJCQl3cml0ZQoJCQkoCgkJCQlzZWxmLmxi
+bFsxXSwKCQkJCXNlbGY6eCgpKzIsCgkJCQlzZWxmOnkoKSsyLAoJCQkJc2VsZi5sYmxfY29sCgkJ
+CSkKCQllbmQKCWVuZAoJLS1hY3RpdmUtaG92ZXIKCWlmIGlzX2FjdGl2ZSA9PSB0cnVlIGFuZCBz
+ZWxmOmhvdmVyKCkgYW5kIG5vdCBzZWxmOnB1c2hlZCgpIHRoZW4KCQktLXN0cm9rZQoJCXJlY3Rm
+aWxsCgkJKAoJCQlzZWxmOngoKSwKCQkJc2VsZjp5KCksCgkJCXNlbGY6eCgpK3NlbGYudy0xLAoJ
+CQlzZWxmOnkoKStzZWxmLmgtMSwKCQkJc2VsZi5sYmxfY29sCgkJKQoJCS0tdG9wCgkJcmVjdGZp
+bGwKCQkoCgkJCXNlbGY6eCgpKzEsCgkJCXNlbGY6eSgpKzEsCgkJCXNlbGY6eCgpK3NlbGYudy0y
+LAoJCQlzZWxmOnkoKSsxKzYsCgkJCTcKCQkpCgkJLS1zaWRlCgkJcmVjdGZpbGwKCQkoCgkJCXNl
+bGY6eCgpKzEsCgkJCXNlbGY6eSgpKzErOCwKCQkJc2VsZjp4KCkrc2VsZi53LTIsCgkJCXNlbGY6
+eSgpK3NlbGYuaC0yLAoJCQk3CgkJKQoJCS0tbmFtZQoJCWlmIHNlbGYubGJsIHRoZW4KCQkJd3Jp
+dGUKCQkJKAoJCQkJc2VsZi5sYmxbMV0sCgkJCQlzZWxmOngoKSsyLAoJCQkJc2VsZjp5KCkrMiwK
+CQkJCXNlbGYubGJsX2NvbAoJCQkpCgkJZW5kCgllbmQKCS0tYWN0aXZlLXB1c2hlZAoJaWYgaXNf
+YWN0aXZlID09IHRydWUgYW5kIHNlbGY6cHVzaGVkKCkgdGhlbgoJCS0tc3Ryb2tlCgkJcmVjdGZp
+bGwKCQkoCgkJCXNlbGY6eCgpLAoJCQlzZWxmOnkoKSwKCQkJc2VsZjp4KCkrc2VsZi53LTEsCgkJ
+CXNlbGY6eSgpK3NlbGYuaC0xLAoJCQlzZWxmLmxibF9jb2wKCQkpCgkJLS10b3AKCQlyZWN0Zmls
+bAoJCSgKCQkJc2VsZjp4KCkrMSwKCQkJc2VsZjp5KCkrMSs0LAoJCQlzZWxmOngoKStzZWxmLnct
+MiwKCQkJc2VsZjp5KCkrMSs2KzQsCgkJCTcKCQkpCgkJLS1zaWRlCgkJcmVjdGZpbGwKCQkoCgkJ
+CXNlbGY6eCgpKzEsCgkJCXNlbGY6eSgpKzErOCs0LAoJCQlzZWxmOngoKStzZWxmLnctMiwKCQkJ
+c2VsZjp5KCkrc2VsZi5oLTIsCgkJCTcKCQkpCgkJLS1uYW1lCgkJaWYgc2VsZi5sYmwgdGhlbgoJ
+CQl3cml0ZQoJCQkoCgkJCQlzZWxmLmxibFsxXSwKCQkJCXNlbGY6eCgpKzIsCgkJCQlzZWxmOnko
+KSsyKzQsCgkJCQlzZWxmLmxibF9jb2wKCQkJKQoJCWVuZAoJZW5kCmVuZApmdW5jdGlvbiBidXR0
+b246ZGlzYWJsZSgpCglzZWxmLmlzX2FjdGl2ZSA9IGZhbHNlCglpZiBzZWxmLmNvbCA9PSBwcmlt
+YXJ5X2NvbG9yIHRoZW4KCQlzZWxmLmNvbCA9IHNlY29uZGFyeV9jb2xvciBlbmQKCWlmIHNlbGYu
+bGJsX2NvbCA9PSBzZWNvbmRhcnlfY29sb3IgdGhlbgoJCXNlbGYubGJsX2NvbCA9IHByaW1hcnlf
+Y29sb3IgZW5kCmVuZApmdW5jdGlvbiBidXR0b246ZGVzdHJveSgpCglpZiB0eXBlKHQpIH49ICJ0
+YWJsZSIgdGhlbiByZXR1cm4gZW5kCiAgICAKCWZvciBrLCB2IGluIHBhaXJzKHQpIGRvCgkJaWYg
+dHlwZSh2KSA9PSAidGFibGUiIHRoZW4KCQkJZGVzdHJveV90YWJsZSh2KQoJCQllbmQKCQl0W2td
+ID0gbmlsCgllbmQKZW5kCgpmdW5jdGlvbiBsb2FkX2Zyb21fa2V5KGtleSkKICAgIGlmIG5vdCBr
+ZXkgb3Iga2V5ID09ICIiIHRoZW4gcmV0dXJuIGZhbHNlIGVuZAogICAgbG9jYWwgcG9kX3N0ciA9
+IGZyb21faGV4KGtleSkKICAgIGxvY2FsIGRhdGEgPSB1bnBvZChwb2Rfc3RyKQogICAgaWYgZGF0
+YSBhbmQgZGF0YS54cCB0aGVuCiAgICAgICAgdmFsdWUgPSBkYXRhLnhwCiAgICAgICAgc3RvcmUo
+c2F2ZV9maWxlLCBkYXRhKQogICAgICAgIHJldHVybiB0cnVlCiAgICBlbmQKICAgIHJldHVybiBm
+YWxzZQplbmQKCmZ1bmN0aW9uIHNvcnQoYXJyKQoJbG9jYWwgbiA9ICNhcnIKCWZvciBpPTEsbiBk
+bwoJCWZvciBqPTEsbi1pIGRvCgkJCWlmIGFycltqXS5wb3MueiA8IGFycltqKzFdLnBvcy56IHRo
+ZW4KCQkJCWFycltqXSwgYXJyW2orMV0gPSBhcnJbaisxXSwgYXJyW2pdCgkJCWVuZAoJCWVuZAoJ
+ZW5kCmVuZAoKZnVuY3Rpb24gdXBkYXRlX2xhc3Rfcm93X3BvcygpCglsYXN0X3Jvd19wb3MgPQoJ
+ewoJCXg9NDUsCgkJeT00NSooI2RhdGEuaGFiaXRzKzEpLAoJCXo9LTEwCgl9CmVuZAoKZnVuY3Rp
+b24gZHJhd19zcHJpdGVfeDIoc3ByaXRlX2luZGV4LCB4LCB5KQogIGxvY2FsIHMgPSBnZXRfc3By
+KHNwcml0ZV9pbmRleCkKICBpZiBub3QgcyB0aGVuIHJldHVybiBlbmQKCiAgZm9yIHB5ID0gMCwg
+NyBkbwogICAgZm9yIHB4ID0gMCwgNyBkbwogICAgICBsb2NhbCBjb2wgPSBzOmdldChweCwgcHkp
+CiAgICAgIAogICAgICBpZiBjb2wgfj0gMCB0aGVuIAogICAgICAgIGxvY2FsIGR4ID0geCArIHB4
+ICogMgogICAgICAgIGxvY2FsIGR5ID0geSArIHB5ICogMgogICAgICAgIHJlY3RmaWxsKGR4LCBk
+eSwgZHggKyAxLCBkeSArIDEsIGNvbCkKICAgICAgZW5kCiAgICBlbmQKICBlbmQKZW5kCgpmdW5j
+dGlvbiB3cml0ZShzdHIsIHgsIHksIGNvbCkKCWlmIHN0ciB0aGVuCglsb2NhbCBzID0gdG9zdHJp
+bmcoc3RyKQoJICBsb2NhbCBjdXJfeCA9IHgKCSAgZm9yIHAsIGMgaW4gY2hhcmFjdGVycyhzKSBk
+bwoJICAgIGxvY2FsIGxvID0gY2hyX2xvd2VyKGMpCgkgICAgbG9jYWwgaWQgPSBjaGFyX21hcFts
+b10KCSAgICBpZiBpZCB0aGVuCgkgICAgICBteV9zcHIoaWQsIGN1cl94LCB5LCBjb2wpCgkgICAg
+ICBjdXJfeCArPSA0CgkgICAgZWxzZWlmIGMgPT0gIiAiIHRoZW4KCSAgICAgIGN1cl94ICs9IDQK
+CSAgICBlbmQKCSAgZW5kCiAgZW5kCmVuZApmdW5jdGlvbiBteV9zcHIocywgZHgsIGR5LCBjb2wp
+Cglsb2NhbCBzcHJpdGUgPSBnZXRfc3ByKHMpCglsb2NhbCB3ID0gc3ByaXRlOndpZHRoKCkKCWxv
+Y2FsIGggPSBzcHJpdGU6aGVpZ2h0KCkKCWZvciB5PTAsIGgtMSBkbwoJCWZvciB4PTAsIHctMSBk
+bwoJCQlsb2NhbCBjID0gc3ByaXRlOmdldCh4LCB5KQoJCQlpZiBjID09IDcgdGhlbgoJCQkJcHNl
+dChkeCArIHgsIGR5ICsgeSwgY29sKQoJCQllbmQKCQllbmQKCWVuZAplbmQKCmZ1bmN0aW9uIGNo
+cl9sb3dlcihjKQogIGlmICNjID09IDEgdGhlbgogICAgbG9jYWwgYiA9IG9yZChjKQogICAgaWYg
+YiA_PSA2NSBhbmQgYiA8PSA5MCB0aGVuIHJldHVybiBjaHIoYiArIDMyKSBlbmQKICAgIHJldHVy
+biBjCiAgZW5kCiAgbG9jYWwgYzEgPSBvcmQoc3ViKGMsMSwxKSkKICBsb2NhbCBjMiA9IG9yZChz
+dWIoYywyLDIpKQogIGlmIGMxID09IDB4ZDAgdGhlbgogICAgaWYgYzIgPj0gMHg5MCBhbmQgYzIg
+PD0gMHg5ZiB0aGVuCiAgICAgIHJldHVybiBjaHIoMHhkMCkuLmNocihjMiArIDMyKQogICAgZWxz
+ZWlmIGMyID49IDB4YTAgYW5kIGMyIDw9IDB4YWYgdGhlbgogICAgICByZXR1cm4gY2hyKDB4ZDEp
+Li5jaHIoYzIgLSAzMikKICAgIGVsc2VpZiBjMiA9PSAweDgxIHRoZW4KICAgICAgcmV0dXJuIGNo
+cigweGQxKS4uY2hyKDB4OTEpCiAgICBlbmQKICBlbmQKICByZXR1cm4gYwplbmQKCmZ1bmN0aW9u
+IGNoYXJhY3RlcnMoc3RyKQogIGxvY2FsIGkgPSAxCiAgcmV0dXJuIGZ1bmN0aW9uKCkKICAgIGlm
+IGkgPiAjc3RyIHRoZW4gcmV0dXJuIG5pbCBlbmQKICAgIGxvY2FsIGIgPSBvcmQoc3RyLCBpKQog
+ICAgbG9jYWwgY2hhciA9ICIiCiAgICBsb2NhbCBzdGFydF9pID0gaQogICAgaWYgYiA8IDEyOCB0
+aGVuCiAgICAgIGNoYXIgPSBzdWIoc3RyLCBpLCBpKQogICAgICBpICs9IDEKICAgIGVsc2VpZiBi
+ID49IDE5MiBhbmQgYiA8PSAyMjMgdGhlbgogICAgICBjaGFyID0gc3ViKHN0ciwgaSwgaSArIDEp
+CiAgICAgIGkgKz0gMgogICAgZWxzZWlmIGIgPj0gMjI0IGFuZCBiIDw9IDIzOSB0aGVuCiAgICAg
+IGNoYXIgPSBzdWIoc3RyLCBpLCBpICsgMikKICAgICAgaSArPSAzCiAgICBlbHNlCiAgICAgIGNo
+YXIgPSBzdWIoc3RyLCBpLCBpKQogICAgICBpICs9IDEKICAgIGVuZAogICAgcmV0dXJuIHN0YXJ0
+X2ksIGNoYXIKICBlbmQKZW5kCgpmdW5jdGlvbiB1cGRhdGUxKCkKCWxvY2FsIHR4dCA9IHJlYWR0
+ZXh0KCkKCXJkdHh0KHR4dCkKZW5kCgpmdW5jdGlvbiByZHR4dCh0eHQpCglpZiBpbnB1dF9zdHIg
+dGhlbgoJCWlmIHR4dCB0aGVuCgkJCWlucHV0X3N0clsxXSAuLj0gdHh0CgkJZW5kCgkJaWYga2V5
+cCgiYmFja3NwYWNlIikgYW5kICNpbnB1dF9zdHJbMV0gPiAwIHRoZW4KCQkJbG9jYWwgbGFzdF9w
+b3MgPSAxCgkJCWZvciBwLCBjIGluIGNoYXJhY3RlcnMoaW5wdXRfc3RyWzFdKQoJCQkJZG8gbGFz
+dF9wb3MgPSBwCgkJCWVuZAoJCQlpbnB1dF9zdHJbMV0gPSBzdWIoaW5wdXRfc3RyWzFdLCAxLCBs
+YXN0X3BvcyAtIDEpCgkJZW5kCgllbmQKZW5kCgpmdW5jdGlvbiBpbml0MSgpCgljaGFyX21hcCA9
+IHt9CgkKCWZvciBpPTAsOSBkbyBjaGFyX21hcFt0b3N0cmluZyhpKV0gPSBpIGVuZAoJCglsb2Nh
+bCBsYXRpbiA9ICJhYmNkZWZnaGlqa2xtbm9wcXJzdHV2d3h5eiIKCWZvciBpPTEsI2xhdGluIGRv
+CgljaGFyX21hcFtzdWIobGF0aW4saSxpKV0gPSA5ICsgaQoJZW5kCgkKCWxvY2FsIGN5ciA9IHsi
+0LAiLCLQsSIsItCyIiwi0LMiLCLQtCIsItC1Iiwi0ZEiLCLQtiIsItC3Iiwi0LgiLCLQuSIsItC6
+Iiwi0LsiLCLQvCIsItC9Iiwi0L4iLCLQvyIsItGAIiwi0YEiLCLRgiIsItGDIiwi0YQiLCLRhSIs
+ItGGIiwi0YciLCLRiCIsItGJIiwi0YoiLCLRiyIsItGMIiwi0Y0iLCLRjiIsItGPIn0KCWZvciBp
+PTEsI2N5ciBkbwoJY2hhcl9tYXBbY3lyW2ldXSA9IDM1ICsgaQoJZW5kCgkKCWNoYXJfbWFwWyIt
+Il0gPSA2OQoJY2hhcl9tYXBbIjoiXSA9IDcwCgljaGFyX21hcFsiOyJdID0gNzEKCWNoYXJfbWFw
+WyIvIl0gPSA3MgoJY2hhcl9tYXBbIi4iXSA9IDczCmVuZAoKaW5jbHVkZSAiaW5pdC5sdWEiCgps
+b2NhbCBibGFja19zY3JlZW4gPSBmYWxzZQpsb2NhbCBwb3N0X2JsYWNrX3NjcmVlbiA9IGZhbHNl
+CmxvY2FsIHRpbWVyX3RvX2xpbWVfc3RhZ2UgPSAtMQpmdW5jdGlvbiBzdGFydF90aW1lcl90b19s
+aW1lX3N0YWdlKCkKCXRpbWVyX3RvX2xpbWVfc3RhZ2UgPSB0KCkgKyA0LjAKZW5kCmxvY2FsIHRp
+bWVyX3RvX2JsYWNrX3NjcmVlbiA9IC0xCmZ1bmN0aW9uIHN0YXJ0X3RpbWVyX3RvX2JsYWNrX3Nj
+cmVlbigpCgl0aW1lcl90b19ibGFja19zY3JlZW4gPSB0KCkgKyA0LjAKZW5kCmxvY2FsIHRpbWVy
+X3RvX2dyZWVuX3N0YWdlID0gLTEKZnVuY3Rpb24gc3RhcnRfdGltZXJfdG9fZ3JlZW5fc3RhZ2Uo
+KQoJdGltZXJfdG9fZ3JlZW5fc3RhZ2UgPSB0KCkgKyA0LjAKZW5kCmZ1bmN0aW9uIF91cGRhdGUo
+KQoJaWYgdGltZXJfdG9fbGltZV9zdGFnZSA_IDAgYW5kIHRpbWVyX3RvX2xpbWVfc3RhZ2UgPCB0
+KCkgdGhlbgoJCXRpbWVyX3RvX2xpbWVfc3RhZ2UgPSAtMQoJCXNyYzpzdGFydF9zdGFnZShzcmMu
+c3RhZ2VzLmJmcl9saW1lKQoJZW5kCglpZiB0aW1lcl90b19ibGFja19zY3JlZW4gPiAwIGFuZCB0
+aW1lcl90b19ibGFja19zY3JlZW4gPCB0KCkgdGhlbgoJCXRpbWVyX3RvX2JsYWNrX3NjcmVlbiA9
+IC0xCgkJYmxhY2tfc2NyZWVuID0gdHJ1ZQoJCXN0YXJ0X3RpbWVyX3RvX2dyZWVuX3N0YWdlKCkK
+CWVuZAoJaWYgdGltZXJfdG9fZ3JlZW5fc3RhZ2UgPiAwIGFuZCB0aW1lcl90b19ncmVlbl9zdGFn
+ZSA8IHQoKSB0aGVuCgkJdGltZXJfdG9fZ3JlZW5fc3RhZ2UgPSAtMQoJCWlmIHNyYy5jdXJyX3N0
+YWdlX25hbWUgPT0gc3JjLnN0YWdlcy5zZW5kX2Jmcl9wcmVfZ3JlZW4gdGhlbgoJCQlzcmM6c3Rh
+cnRfc3RhZ2Uoc3JjLnN0YWdlcy5zZW5kX2Jmcl9ncmVlbikKCQllbHNlaWYgc3JjLmN1cnJfc3Rh
+Z2VfbmFtZSA9PSBzcmMuc3RhZ2VzLndpcGVfYmZyX3ByZV9ncmVlbiB0aGVuCgkJCXNyYzpzdGFy
+dF9zdGFnZShzcmMuc3RhZ2VzLndpcGVfYmZyX2dyZWVuKQoJCWVuZAoJZW5kCgoJYW5pbV91cGRh
+dGUoKQoJaWYga2V5KCJzIikgdGhlbiBza2lwX2FuaW0oKSBlbmQKCWlmIGFuaW1faXNudF9yZWFk
+eSgpIHRoZW4gcmV0dXJuIGVuZAoKCWxvY2FsIGNoZWNrID0gZmFsc2UKCWZvciBjIGluIGFsbChh
+Y3RpdmVfY2FudmFzZXMpIGRvCgkJaWYgYyA9PSBoYWJpdHNfY2FudmFzIHRoZW4KCQkJZ2FtZV91
+cGRhdGUoKQoJCWVuZAoJZW5kCgkKCWxvY2FsIG14LCBteSwgbWIgPSBtb3VzZSgpCgkKCWZvciBj
+IGluIGFsbChhY3RpdmVfY2FudmFzZXMpCglkbyBjOnVwZGF0ZSgpCgllbmQKCQoJcHJldl9tYiA9
+IG1iCgl1cGRhdGUxKCkKCQoJY3Vycl9kYXRlID0gIiIKCWZvciBpPTEsMTAgZG8KCQljdXJyX2Rh
+dGUgLi49IHRvc3RyaW5nKGR0KCkpW2ldCgllbmQKCWlmIHByZXZfZGF0ZSAhPSBjdXJyX2RhdGUg
+dGhlbgoJCWZvciBiIGluIGFsbChkYXRhLmJhcnMpIGRvCgkJCWIuaW5keCArPSAxCgkJZW5kCgkJ
+ZGF0YS5sb2dfc2V0ID0ge30KCQliYXI6bmV3CgkJKAoJCQlzdGF0aXN0aWNzX2NhbnZhcywKCQkJ
+ewoJCQkJeD0wLAoJCQkJeT0wLAoJCQkJej0xMAoJCQl9LAoJCQl7Y3Vycl9kYXRlfSwKCQkJZGF0
+YS5sb2dfc2V0LAoJCQkxCgkJKQoJZW5kCglwcmV2X2RhdGUgPSBjdXJyX2RhdGUKCQoJaWYga2V5
+KCJzcGFjZSIpIHRoZW4KCQlrZXlfc3BhY2VfY3Vycl92YWwgPSB0cnVlCgkJaWYga2V5X3NwYWNl
+X3ByZXZfdmFsID09IGZhbHNlIHRoZW4KCQkJbmV4dF90YWIoKQoJCWVuZAoJZWxzZQoJCWtleV9z
+cGFjZV9jdXJyX3ZhbCA9IGZhbHNlCgllbmQKCWtleV9zcGFjZV9wcmV2X3ZhbCA9IGtleV9zcGFj
+ZV9jdXJyX3ZhbAplbmQKCmZ1bmN0aW9uIGdldF9sdmxfc3RyKCkKCWxvY2FsIHR0bF9leHAgPSAw
+Cglmb3IgYiBpbiBhbGwoZGF0YS5iYXJzKSBkbwoJCXR0bF9leHAgKz0gYjpnZXRfdmFsdWUoKQoJ
+ZW5kCglsb2NhbCBsdmwgPSB0dGxfZXhwIFwgMTAwMCArIDEKCWxvY2FsIGN1cl9leHAgPSB0dGxf
+ZXhwICUgMTAwMAoJCglsb2NhbCBvdXQgPSAibHZsOiAiLi5sdmwKCXJldHVybiBvdXQKZW5kCgpm
+dW5jdGlvbiBnZXRfZXhwX3N0cigpCglsb2NhbCB0dGxfZXhwID0gMAoJZm9yIGIgaW4gYWxsKGRh
+dGEuYmFycykgZG8KCQl0dGxfZXhwICs9IGI6Z2V0X3ZhbHVlKCkKCWVuZAoJbG9jYWwgbHZsID0g
+dHRsX2V4cCBcIDEwMDAKCWxvY2FsIGN1cl9leHAgPSB0dGxfZXhwICUgMTAwMAoJCglsb2NhbCBv
+dXQgPSAiZXhwOiAiLi5jdXJfZXhwLi4iLzEwMDAiCglyZXR1cm4gb3V0CmVuZAoKZnVuY3Rpb24g
+X2RyYXcoKQoJYW5pbV9kcmF3KCkKCWlmIGtleSgicyIpIHRoZW4gc2tpcF9hbmltKCkgZW5kCglp
+ZiBhbmltX2lzbnRfcmVhZHkoKSB0aGVuIHJldHVybiBlbmQKCQoJY2xzKDApCgkKCWZvciBjIGlu
+IGFsbChhY3RpdmVfY2FudmFzZXMpIGRvCgkJaWYgYyA9PSBoYWJpdHNfY2FudmFzIHRoZW4KCQkJ
+bWFwKDAsIDAsIDAsIDAsIDYwLCAzNCkKCQkJZ2FtZV9kcmF3KCkKCQllbmQKCWVuZAoJCglmb3Ig
+YyBpbiBhbGwoYWN0aXZlX2NhbnZhc2VzKSBkbwoJCWlmIGMgPT0gaGFiaXRzX2NhbnZhcyB0aGVu
+CgkJCWZvciBzIGluIGFsbChzaWduYWxzKSBkbwoJCQkJZm9yIG8gaW4gYWxsKHMuY2lyY3MpIGRv
+CgkJCQkJbzpkcmF3KCkKCQkJCWVuZAoJCQllbmQKCQllbHNlCgkJCWZvciBvIGluIGFsbChvcykg
+ZG8KCQkJCW86ZHJhdygpCgkJCWVuZAoJCWVuZAoJZW5kCgkKCWZvciBjIGluIGFsbChhY3RpdmVf
+Y2FudmFzZXMpIGRvCgkJaWYgYyA9PSBoYWJpdHNfY2FudmFzIHRoZW4KCQkJZm9yIHMgaW4gYWxs
+KG1haW5fY2hhci5hbmltYXRvci5zcHJpdGVzKSBkbwoJCQkJaWYgcy5pbmRleCA9PSAyMDUgdGhl
+bgoJCQkJCXM6ZHJhdygpCgkJCQllbmQKCQkJZW5kCgkJCWZvciBwIGluIGFsbChwZXJzb25zKSBk
+bwoJCQkJcDpkcmF3X25hbWUoKQoJCQllbmQKCQkJbWFwKDYwLCAwLCAwLCAwLCA2MCwgMzQpCgkJ
+ZW5kCgllbmQKCQoJZm9yIGMgaW4gYWxsKGFjdGl2ZV9jYW52YXNlcykKCQlkbyBjOmRyYXcoKQoJ
+ZW5kCgkKCWxvY2FsIG1hcmdpbiA9IDQKCWxvY2FsIGJ1eF90eHQgPSAiYnV4ICIuLnNhdmVfZGF0
+YS5idXguLiI7IgoJbG9jYWwgcXVvdGFfdHh0ID0gInF1b3RhOiAiLi5zYXZlX2RhdGEuc2lnbmFs
+c19yZWNlaXZlZC4uIi8xMDsiCglsb2NhbCB0YXNrX3R4dCA9ICJ0YXNrOiAiLi5zcmMuY3Vycl9z
+dGFnZV9uYW1lCgl3cml0ZShidXhfdHh0LCBtYXJnaW4sIG1hcmdpbiwgcHJpbWFyeV9jb2xvcikK
+CXdyaXRlKHF1b3RhX3R4dCwgbWFyZ2luKygjYnV4X3R4dCo0LTEpKzIqbWFyZ2luLCBtYXJnaW4s
+IHByaW1hcnlfY29sb3IpCgl3cml0ZSh0YXNrX3R4dCwgbWFyZ2luKygjYnV4X3R4dCo0LTEpKzIq
+bWFyZ2luKygjcXVvdGFfdHh0KjQtMSkrMiptYXJnaW4sIG1hcmdpbiwgcHJpbWFyeV9jb2xvcikK
+CXdyaXRlKGR0KCksIDQ4MC03NS1tYXJnaW4sIG1hcmdpbiwgcHJpbWFyeV9jb2xvcikKCQoJbG9j
+YWwgY2hlY2sgPSBmYWxzZQoJZm9yIGMgaW4gYWxsKGFjdGl2ZV9jYW52YXNlcykgZG8KCQlpZiBj
+ID09IGxhdF9rZXlzX2NhbnZhcyBvciBjID09IGN5cl9rZXlzX2NhbnZhcyB0aGVuIGNoZWNrID0g
+dHJ1ZSBlbmQKCWVuZAoJaWYgY2hlY2sgdGhlbiBteV9zcHIoODAsIDI1LCAyNTAsIDE3KSBlbmQK
+CQoJY2hlY2sgPSBmYWxzZQoJZm9yIGMgaW4gYWxsKGFjdGl2ZV9jYW52YXNlcykgZG8KCQlpZiBj
+ID09IG51bXBhZF9jYW52YXMgdGhlbiBjaGVjayA9IHRydWUgZW5kCgllbmQKCWlmIGNoZWNrIHRo
+ZW4gbXlfc3ByKDgwLCAxNjAsIDI1MCwgMTcpIGVuZAoJCgktLURFQlVHCi0tCXByaW50KCJjdXJy
+X3N0YWdlX25hbWU6ICIuLihzcmMuY3Vycl9zdGFnZV9uYW1lIG9yIC00KSwgMCwgMCwgOCkKCQot
+LQlwcmludCgiI3NhdmVfZGF0YS5sb2dfY2xyX3ZhbHM6ICIuLigjc2F2ZV9kYXRhLmxvZ19jbHJf
+dmFscyBvciAtNCksIDAsIDAsIDgpCi0tCXByaW50KCJzYXZlX2RhdGEubG9nX2Nscl92YWxzWzBd
+OiAiLi4oc2F2ZV9kYXRhLmxvZ19jbHJfdmFsc1swXSBvciAtNCksIDAsIDUwLCA4KQotLQlwcmlu
+dCgic2F2ZV9kYXRhLmxvZ19jbHJfdmFsc1sxXTogIi4uKHNhdmVfZGF0YS5sb2dfY2xyX3ZhbHNb
+MV0gb3IgLTQpLCAwLCAxMDAsIDgpCi0tCXByaW50KCJzYXZlX2RhdGEubG9nX2Nscl92YWxzWzJd
+OiAiLi4oc2F2ZV9kYXRhLmxvZ19jbHJfdmFsc1syXSBvciAtNCksIDAsIDE1MCwgOCkKLS0JcHJp
+bnQoInNhdmVfZGF0YS5sb2dfY2xyX3ZhbHNbM106ICIuLihzYXZlX2RhdGEubG9nX2Nscl92YWxz
+WzNdIG9yIC00KSwgMCwgMjAwLCA4KQplbmQ=
+:: map/.info.pod
+--[[pod,created="2026-03-27 05:34:19",modified="2026-04-20 19:05:04"]]
+:: map/0.map
+b64$LS1bW3BvZCxjcmVhdGVkPSIyMDI1LTAxLTE3IDEwOjM1OjQ4Iixtb2RpZmllZD0iMjAyNi0w
+NC0xOCAxOTowOTo0NSIscmV2aXNpb249MjJdXWx6NABjAAAAtAEAAP8Fe3tibXA9cHh1AEyAeCIA
+O_AAO9wGAA9-AdwAN_EAAQwA-x8FRAHxCCxoaWRkZW49ZmFsc2UscGFuX3g9LTQ4CgDCeT0wLHRp
+bGVfaD04CQDwAHc9OCx6b29tPTAuMjV9fQ==
+:: objs/.info.pod
+--[[pod,created="2026-04-18 11:22:32",modified="2026-04-20 19:05:04"]]
+:: sfx/.info.pod
+--[[pod,created="2026-03-27 05:34:19",modified="2026-04-20 19:05:04"]]
+:: sfx/0.sfx
+b64$LS1bW3BvZCxjcmVhdGVkPSIyMDI1LTA3LTMxIDA4OjMwOjI4Iixtb2RpZmllZD0iMjAyNi0w
+NC0yMCAwMDo1MToxNCIscmV2aXNpb249MzRdXWx6NACxAAAAlQoAAP8wcHh1AAMoAAAEAAQPQBAC
+DgABoAEgAqAOAA8QAA3wygECA0APD5AEBQYHQAyQCAkKC0AMkA8MDw0PDgxADPD-AQDr-yeqARAG
+DzAQASABIAHwAAIQAg4QASAPISABMA9A8MMPKA--8MYP_AoP-w_AD-cPDQHwCQEQBg4wAP------
+vR--AQCs-wPKAkD--7DweP2w8HAPQAAPEEAKAHIv-7kVAAEPAQD-01D-----Ag==
+:: t/.info.pod
+--[[pod,created="2026-04-18 01:13:03",file_item={},modified="2026-04-20 19:05:04"]]
+:: t/gfx/.info.pod
+--[[pod,created="2026-03-27 05:34:19",modified="2026-04-20 19:05:04"]]
+:: t/gfx/0.gfx
+b64$LS1bW3BvZCxjcmVhdGVkPSIyMDI1LTAxLTE3IDEwOjM1OjQ4Iixtb2RpZmllZD0iMjAyNi0w
+NC0wOSAwMzoxNTozMyIscmV2aXNpb249N11dbHo0AHwBAABIMwAA8yJ7WzBdPXtibXA9cHh1AEMg
+CAgEPw8AJwAOAA4AJz4AJ0D3EyxmbGFncz0wLHBhbl94CADeeT0wLHpvb209MTB9LEAAHz49ACUz
+AD8PfQAvAD5AACYfPj0AJDBPDyd7AD8OJ04_ACQfTjoAIyAAL3MBEi4EAA9AAGH-Ag8PABMnIBNH
+IDcAHQA3IPcMQgAlTzcwNzCAAB8QAz8AzzcDIDcQVx0ARyD3DUEAJl8gRyD3FT4AHX9hB2EXQfca
+NwAaXxAQBPDwMgB_3wgIBDMAJwADAAMAJzMLAiIRMzkADzwAIyMAM3sALwAzPwAlHzM8ACQgQyd5
+AD8DJ0M9ACMfQzkAI0QAIwAnBAAPPwBgFQO1Ax8TtQMjHwO0AyoTA7MDHxOzAyQeA7IDD0kDFw8y
+AP------------------------------------------QmUICAQRACECAEUBgCEAAgAfcHwAHw8y
+AP---------------wBQPTEwfX0=
+:: ui/.info.pod
+--[[pod,created="2026-04-19 01:57:23",modified="2026-04-20 19:05:04"]]
+:: xp
+b64$LS1bW3BvZCxjcmVhdGVkPSIyMDI2LTA0LTExIDA2OjAxOjA4Iixtb2RpZmllZD0iMjAyNi0w
+NC0xMSAwNjowNjowNSIscmV2aXNpb249MTNdXWx6NAACAAAAAQAAABA5
+:: [eoc]
